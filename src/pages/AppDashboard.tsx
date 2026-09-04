@@ -1,37 +1,26 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
 import { Button } from "@/components/ui/button";
-import { useAuth, signOut } from "@/hooks/useAuth";
+import { signOut, useAuth } from "@/hooks/useAuth";
+import { useDocumentMeta } from "@/lib/useDocumentMeta";
 
 const title = "Dashboard — Video Speed Reader";
 const description = "Your Video Speed Reader dashboard for uploads and transcripts.";
 
-export const Route = createFileRoute("/app")({
-  head: () => ({
-    meta: [
-      { title },
-      { name: "description", content: description },
-      { property: "og:title", content: title },
-      { property: "og:description", content: description },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "robots", content: "noindex" },
-    ],
-  }),
-  component: AppShell,
-});
+export default function AppDashboard() {
+  useDocumentMeta({ title, description, robots: "noindex" });
 
-function AppShell() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/signin" });
+    if (!loading && !user) navigate("/signin");
   }, [loading, user, navigate]);
 
   async function handleSignOut() {
     await signOut();
-    navigate({ to: "/" });
+    navigate("/");
   }
 
   if (loading || !user) {

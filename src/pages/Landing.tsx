@@ -1,24 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+
 import { Reveal } from "@/components/Reveal";
+import { Button } from "@/components/ui/button";
+import { useDocumentMeta } from "@/lib/useDocumentMeta";
 
 const title = "Video Speed Reader — Transcripts in three minutes";
 const description =
   "Upload your video and get an accurate, clean transcript in three minutes. Chinese and English, commercial-use ready.";
-
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title },
-      { name: "description", content: description },
-      { property: "og:title", content: title },
-      { property: "og:description", content: description },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: Landing,
-});
 
 const features = [
   {
@@ -38,7 +26,9 @@ const features = [
   },
 ];
 
-function Landing() {
+export default function Landing() {
+  useDocumentMeta({ title, description });
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur">

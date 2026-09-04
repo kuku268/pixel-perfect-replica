@@ -1,24 +1,63 @@
 # Pixel Perfect Replica
 
-Implement exactly the screenshot and nothing else
+Video Speed Reader — upload a video, get a clean transcript in three minutes.
 
-This project was built with [Lovable](https://lovable.dev).
+This is a **plain Vite + React single-page app**. There is no SSR and no server
+runtime: `vite build` emits a fully static bundle to `dist/`, which is what
+Vercel deploys.
 
-## Build with Lovable
+## Stack
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/d54fe20b-38c1-44ee-bbec-1ff6644c63e0).
+- Vite + React 19 (`@vitejs/plugin-react`)
+- React Router (`react-router-dom`) for client-side routing
+- Tailwind CSS v4 (`@tailwindcss/vite`) + shadcn/ui
+- Supabase for auth (`@supabase/supabase-js`)
+- TanStack Query for data fetching
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+## Routes
+
+| Path | Component |
+| --- | --- |
+| `/` | `src/pages/Landing.tsx` |
+| `/app` | `src/pages/AppDashboard.tsx` (requires a session) |
+| `/signin` | `src/pages/SignIn.tsx` |
+| `/signup` | `src/pages/SignUp.tsx` |
+| anything else | `src/pages/NotFound.tsx` |
+
+Routes are declared in `src/App.tsx`. There is no file-based routing and no
+generated route tree.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requires Node.js 20+.
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+npm install
+npm run dev      # http://localhost:8080
+npm run build    # -> dist/
+npm run preview  # serve the production build locally
 ```
+
+## Environment variables
+
+The Supabase client reads Vite-exposed variables at build time:
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_SUPABASE_PROJECT_ID=
+```
+
+These live in `.env` and must also be set in the Vercel project settings, since
+they are inlined during the build.
+
+## Deploying to Vercel
+
+`vercel.json` pins the static setup:
+
+- build `npm run build`, output `dist/`
+- a catch-all rewrite (`/(.*)` → `/index.html`) so deep links such as `/app`
+  are served the SPA shell and resolved by React Router on the client
+
+Vercel serves matching static files before applying rewrites, so hashed assets
+under `/assets/*` are unaffected.
