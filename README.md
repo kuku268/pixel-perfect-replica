@@ -40,16 +40,19 @@ npm run preview  # serve the production build locally
 
 ## Environment variables
 
-The Supabase client reads Vite-exposed variables at build time:
+The app talks to its own Supabase project (`mrenevvyphpwrhicdwmo`). The client in
+`src/integrations/supabase/client.ts` is created once and reads only from Vite env:
 
 ```
-VITE_SUPABASE_URL=
-VITE_SUPABASE_PUBLISHABLE_KEY=
-VITE_SUPABASE_PROJECT_ID=
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+VITE_SUPABASE_PROJECT_ID=<project-ref>
 ```
 
-These live in `.env` and must also be set in the Vercel project settings, since
-they are inlined during the build.
+`VITE_SUPABASE_PUBLISHABLE_KEY` is Supabase's current name for the browser-safe,
+RLS-gated key (formerly the "anon key"). Values live in `.env` (see
+`.env.example`) and are inlined at build time, so set the same three variables
+in the Vercel project settings if you ever stop committing `.env`.
 
 ## Deploying to Vercel
 

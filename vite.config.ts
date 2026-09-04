@@ -13,11 +13,6 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  // Some generated integration files read `process.env` as an SSR fallback.
-  // There is no server any more, so shim it to an empty object in the browser.
-  define: {
-    "process.env": "{}",
-  },
   build: {
     outDir: "dist",
     sourcemap: false,
