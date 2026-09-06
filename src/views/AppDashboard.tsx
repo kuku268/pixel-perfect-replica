@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { BrandMark } from "@/components/BrandMark";
@@ -39,9 +40,14 @@ export default function AppDashboard() {
       <header className="border-b border-border/70 bg-background/70 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <BrandMark />
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            Sign out / 登出
-          </Button>
+          <div className="flex items-center gap-4">
+            <Link href="/upload" className="text-sm font-medium text-primary hover:underline">
+              Upload
+            </Link>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              Sign out / 登出
+            </Button>
+          </div>
         </div>
       </header>
 
