@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import { AuthCard } from "@/components/AuthCard";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseBrowserClient } from "@/integrations/supabase/client";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
 
 const title = "Create your account — Video Speed Reader";
@@ -26,6 +26,7 @@ export default function SignUp() {
   }, [loading, session, router]);
 
   async function handleSubmit(email: string, password: string) {
+    const supabase = getSupabaseBrowserClient();
     setPending(true);
     const { data, error } = await supabase.auth.signUp({
       email,

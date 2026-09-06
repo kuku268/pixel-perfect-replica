@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import { AuthCard } from "@/components/AuthCard";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseBrowserClient } from "@/integrations/supabase/client";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
 
 const title = "Sign in — Video Speed Reader";
@@ -25,6 +25,7 @@ export default function SignIn() {
   }, [loading, session, router]);
 
   async function handleSubmit(email: string, password: string) {
+    const supabase = getSupabaseBrowserClient();
     setPending(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setPending(false);

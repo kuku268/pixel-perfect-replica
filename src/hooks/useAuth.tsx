@@ -1,12 +1,17 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+
+import { getSupabaseBrowserClient } from "@/integrations/supabase/client";
 
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
@@ -26,5 +31,5 @@ export function useAuth() {
 }
 
 export async function signOut() {
-  await supabase.auth.signOut();
+  await getSupabaseBrowserClient().auth.signOut();
 }
