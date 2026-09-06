@@ -1,0 +1,25 @@
+[Unit]
+Description=M1 Whisper distributor (polls Supabase, spawns worker.py)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/app/worker
+ExecStart=/home/ubuntu/app/worker/venv/bin/python /home/ubuntu/app/worker/distributor.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/m1-distributor.log
+StandardError=append:/var/log/m1-distributor.log
+# CRITICAL: systemd's default PATH is /usr/bin:/bin, which does NOT include the
+# venv's bin/. Without this line subprocess.run(["yt-dlp", ...]) in worker.py
+# dies with FileNotFoundError: 'yt-dlp', and the traceback only shows up in
+# /var/log/m1-distributor.log — never in journalctl.
+Environment=PATH=/home/ubuntu/app/worker/venv/bin:/usr/local/bin:/usr/bin:/bin
+# Must match the region the EC2 runs in, or boto3 raises NoRegionError.
+# This instance (i-0b538263173feea62) is in us-east-1.
+Environment=AWS_DEFAULT_REGION=us-east-1
+
+[Install]
+WantedBy=multi-user.target
