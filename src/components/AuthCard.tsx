@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { BrandMark } from "@/components/BrandMark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,14 +30,12 @@ export function AuthCard({
   return (
     <div className="flex min-h-screen flex-col bg-hero">
       <header className="mx-auto flex w-full max-w-6xl items-center px-5 py-4">
-        <Link to="/" className="text-base font-semibold tracking-tight">
-          Video<span className="text-brand-gradient"> Speed Reader</span>
-        </Link>
+        <BrandMark to="/" />
       </header>
 
       <main className="flex flex-1 items-center justify-center px-5 py-12">
         <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-card">
-          <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-primary">{heading}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{subheading}</p>
 
           <form onSubmit={submit} className="mt-8 space-y-4">

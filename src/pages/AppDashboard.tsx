@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { BrandMark } from "@/components/BrandMark";
 import { Button } from "@/components/ui/button";
 import { signOut, useAuth } from "@/hooks/useAuth";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
@@ -32,12 +33,10 @@ export default function AppDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/60">
+    <div className="min-h-screen bg-hero">
+      <header className="border-b border-border/70 bg-background/70 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-          <span className="text-base font-semibold tracking-tight">
-            Video<span className="text-brand-gradient"> Speed Reader</span>
-          </span>
+          <BrandMark />
           <Button variant="outline" size="sm" onClick={handleSignOut}>
             Sign out / 登出
           </Button>
@@ -45,7 +44,7 @@ export default function AppDashboard() {
       </header>
 
       <main className="mx-auto max-w-5xl px-5 py-16">
-        <h1 className="text-3xl font-semibold tracking-tight">Hi {user.email}</h1>
+        <h1 className="font-display text-4xl font-semibold tracking-tight text-primary">Hi {user.email}</h1>
         <div className="mt-8 rounded-2xl border border-border bg-card p-8 shadow-card">
           <p className="text-muted-foreground">
             Your dashboard is coming soon. Upload functionality will be added in the next
