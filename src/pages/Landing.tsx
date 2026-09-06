@@ -1,5 +1,7 @@
+"use client";
+
 import { Clock, ShieldCheck, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 
 import { BrandMark } from "@/components/BrandMark";
 import { Reveal } from "@/components/Reveal";
@@ -40,7 +42,7 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
           <BrandMark />
           <Button asChild size="sm">
-            <Link to="/signin">Sign in / 登入</Link>
+            <Link href="/sign-in">Sign in / 登入</Link>
           </Button>
         </div>
       </header>
@@ -65,10 +67,10 @@ export default function Landing() {
             <Reveal delay={140}>
               <div className="mt-10 flex flex-wrap justify-center gap-3">
                 <Button asChild size="lg" className="shadow-glow">
-                  <Link to="/signup">Get started — free</Link>
+                  <Link href="/sign-up">Get started — free</Link>
                 </Button>
                 <Button asChild size="lg" variant="outline">
-                  <Link to="/signin">I have an account</Link>
+                  <Link href="/sign-in">I have an account</Link>
                 </Button>
               </div>
             </Reveal>

@@ -1,5 +1,8 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { AuthCard } from "@/components/AuthCard";
@@ -13,13 +16,13 @@ const description = "Sign in to Video Speed Reader to manage your video transcri
 export default function SignIn() {
   useDocumentMeta({ title, description });
 
-  const navigate = useNavigate();
+  const router = useRouter();
   const { session, loading } = useAuth();
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    if (!loading && session) navigate("/app");
-  }, [loading, session, navigate]);
+    if (!loading && session) router.push("/app");
+  }, [loading, session, router]);
 
   async function handleSubmit(email: string, password: string) {
     setPending(true);
@@ -29,7 +32,7 @@ export default function SignIn() {
       toast.error(error.message);
       return;
     }
-    navigate("/app");
+    router.push("/app");
   }
 
   return (
@@ -42,7 +45,7 @@ export default function SignIn() {
       footer={
         <>
           Don't have an account?{" "}
-          <Link to="/signup" className="font-medium text-primary hover:underline">
+          <Link href="/sign-up" className="font-medium text-primary hover:underline">
             Sign up
           </Link>
         </>

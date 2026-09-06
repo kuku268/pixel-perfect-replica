@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+"use client";
+
+import Link from "next/link";
 
 // Logo lockup used in every header: a small forest-green tile + the product name.
 // `to` makes it a link (auth pages link back home); omit it for a static label.
@@ -16,7 +18,7 @@ export function BrandMark({ to, className = "" }: { to?: string; className?: str
   );
   const classes = `inline-flex items-center gap-2.5 ${className}`;
   return to ? (
-    <Link to={to} className={classes}>
+    <Link href={to} className={classes}>
       {content}
     </Link>
   ) : (

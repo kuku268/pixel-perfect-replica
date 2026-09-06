@@ -1,5 +1,7 @@
+"use client";
+
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 
 import { BrandMark } from "@/components/BrandMark";
 import { Button } from "@/components/ui/button";
@@ -12,16 +14,16 @@ const description = "Your Video Speed Reader dashboard for uploads and transcrip
 export default function AppDashboard() {
   useDocumentMeta({ title, description, robots: "noindex" });
 
-  const navigate = useNavigate();
+  const router = useRouter();
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && !user) navigate("/signin");
-  }, [loading, user, navigate]);
+    if (!loading && !user) router.push("/sign-in");
+  }, [loading, user, router]);
 
   async function handleSignOut() {
     await signOut();
-    navigate("/");
+    router.push("/");
   }
 
   if (loading || !user) {
