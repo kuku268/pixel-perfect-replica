@@ -95,7 +95,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
             "sequencing words (first, next, then, finally, 首先, 接著, 最後) — the order of " +
             "the list already carries that. Use only what the transcript says: add no " +
             "outside facts, speculate about nothing, and never invent timestamps, since " +
-            "the transcript carries no timing data.",
+            "the transcript carries no timing data. Close with ONE sentence on what the " +
+            "video is ultimately for — the takeaway a reader would act on. Three parts in " +
+            "all: opening sentence, bullet list, closing sentence.",
         },
         {
           role: "user",
