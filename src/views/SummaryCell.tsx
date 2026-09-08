@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { FileText, Sparkles } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -59,14 +59,21 @@ export function SummaryCell({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="font-medium text-primary hover:underline"
+          className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
         >
+          <FileText aria-hidden="true" className="size-4" />
           View
         </button>
       ) : (
-        <Button variant="outline" size="sm" onClick={generate} disabled={pending}>
-          {pending ? "Summarising…" : "Summarise"}
-        </Button>
+        <button
+          type="button"
+          onClick={generate}
+          disabled={pending}
+          className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:no-underline"
+        >
+          <Sparkles aria-hidden="true" className="size-4" />
+          {pending ? "Summarizing…" : "Summarize"}
+        </button>
       )}
 
       {error ? (
