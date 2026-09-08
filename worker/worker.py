@@ -43,6 +43,21 @@ openai_client = OpenAI(api_key=_secrets["OPENAI_API_KEY"])
 # so 600-second chunks stay well clear of the limit.
 CHUNK_SECONDS = 600
 
+# Whisper accepts a prompt (~224 tokens) that biases decoding toward the spelling
+# and vocabulary it contains. Without it, near-homophones of product names come
+# out wrong and stay wrong all the way through to the summary — a real run
+# transcribed "Claude Code" as "Cloud Code" seventeen times.
+#
+# The user's own Topic field is the better hint, so it goes first; this list is
+# the fallback for when they leave it blank.
+DEFAULT_WHISPER_PROMPT = (
+    "Claude Code, Anthropic, GitHub Copilot, Google Jules, Cursor, OpenAI, "
+    "codebase, repository, snippet, context window, embedding, prompt, agent"
+)
+
+# The API caps the prompt at 224 tokens and silently ignores the overflow.
+MAX_PROMPT_CHARS = 600
+
 
 def _utc_now() -> str:
     # PostgREST sends this straight into the UPDATE, so it has to be a real
@@ -122,13 +137,20 @@ def split_chunks(mp3_path: Path, dest_dir: Path) -> list[Path]:
     return chunks
 
 
-def transcribe_chunk(chunk_path: Path, language: str) -> str:
+def build_whisper_prompt(topic: str | None) -> str:
+    """Topic first (it is specific to this video), then the standing glossary."""
+    parts = [p.strip() for p in (topic, DEFAULT_WHISPER_PROMPT) if p and p.strip()]
+    return ", ".join(parts)[:MAX_PROMPT_CHARS]
+
+
+def transcribe_chunk(chunk_path: Path, language: str, prompt: str) -> str:
     with open(chunk_path, "rb") as f:
         return openai_client.audio.transcriptions.create(
             model="whisper-1",
             file=f,
             response_format="text",
             language=language,
+            prompt=prompt,
         )
 
 
@@ -149,7 +171,10 @@ def main() -> None:
         chunks = split_chunks(mp3, tmp_path)
         print(f"[{job_id}] transcribing {len(chunks)} chunk(s)", flush=True)
 
-        full_text = "\n\n".join(transcribe_chunk(c, job["language"]) for c in chunks)
+        prompt = build_whisper_prompt(job.get("topic"))
+        full_text = "\n\n".join(
+            transcribe_chunk(c, job["language"], prompt) for c in chunks
+        )
 
         update_session(session_id, subtitle_txt_content=full_text)
         update_job(job_id, status="done")
