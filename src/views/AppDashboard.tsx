@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { BrandMark } from "@/components/BrandMark";
+import { CreditsBadge } from "@/components/CreditsBadge";
 import { Button } from "@/components/ui/button";
 import { signOut, useAuth } from "@/hooks/useAuth";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
@@ -41,6 +42,7 @@ export default function AppDashboard() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <BrandMark />
           <div className="flex items-center gap-4">
+            <CreditsBadge />
             <Link href="/upload" className="text-sm font-medium text-primary hover:underline">
               Upload
             </Link>

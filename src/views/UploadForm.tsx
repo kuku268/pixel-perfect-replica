@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,12 @@ export function UploadForm() {
   const [language, setLanguage] = useState("zh");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [insufficient, setInsufficient] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setInsufficient(false);
     setPending(true);
 
     try {
@@ -39,6 +42,10 @@ export function UploadForm() {
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        if (response.status === 402) {
+          setInsufficient(true);
+          return;
+        }
         setError(body?.error ?? `Request failed (${response.status})`);
         return;
       }
@@ -96,6 +103,15 @@ export function UploadForm() {
           ))}
         </select>
       </div>
+
+      {insufficient ? (
+        <p role="alert" className="text-sm text-destructive">
+          You don&apos;t have enough credits.{" "}
+          <Link href="/credits" className="font-medium underline">
+            Buy credits
+          </Link>
+        </p>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

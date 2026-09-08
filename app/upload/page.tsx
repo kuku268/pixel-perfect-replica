@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BrandMark } from "@/components/BrandMark";
+import { CreditsBadge } from "@/components/CreditsBadge";
 import {
   Table,
   TableBody,
@@ -122,9 +123,12 @@ export default async function UploadPage() {
       <header className="border-b border-border/70 bg-background/70 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <BrandMark to="/app" />
-          <Link href="/app" className="text-sm font-medium text-primary hover:underline">
-            Dashboard
-          </Link>
+          <div className="flex items-center gap-4">
+            <CreditsBadge />
+            <Link href="/app" className="text-sm font-medium text-primary hover:underline">
+              Dashboard
+            </Link>
+          </div>
         </div>
       </header>
 

@@ -44,7 +44,23 @@ export async function POST(request: Request) {
   const topic = typeof body.topic === "string" && body.topic.trim() ? body.topic.trim() : null;
   const language = typeof body.language === "string" && LANGUAGES.has(body.language) ? body.language : "zh";
 
-  // 2. Insert with the Secret key. The caller is already authenticated above,
+  // 2. Fast pre-check: block the obvious "no credits at all" case here so the
+  //    user gets instant feedback. The precise duration-vs-balance check runs on
+  //    the worker, which is the only place the video length is actually known.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("credits_balance")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || Number(profile.credits_balance) < 1) {
+    return NextResponse.json(
+      { error: "insufficient credits — buy more at /credits", code: "insufficient_credits" },
+      { status: 402 },
+    );
+  }
+
+  // 3. Insert with the Secret key. The caller is already authenticated above,
   //    and user_id is taken from the session — never from the request body.
   const admin = createAdminClient();
 

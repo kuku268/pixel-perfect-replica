@@ -33,5 +33,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: [
+    // Skip Next internals, static assets, and the Stripe webhook. Stripe has no
+    // auth cookie, and running auth.getUser() on that request would either 307
+    // it or mutate the body the signature was computed over.
+    "/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };
