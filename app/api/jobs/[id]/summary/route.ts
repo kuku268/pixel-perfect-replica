@@ -98,11 +98,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   if (!hasUsableSpeech(session.subtitle_txt_content)) {
     return NextResponse.json(
-      {
-        error:
-          "No usable speech in this transcript — the audio is probably music or silence, " +
-          "so there is nothing to summarize.",
-      },
+      { error: "Nothing to summarize." },
       { status: 422 },
     );
   }
