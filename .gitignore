@@ -31,3 +31,9 @@ next-env.d.ts
 
 # Local-only env (never committed)
 .env.local
+.env
+.env*.local
+
+# Session scratch
+*.patch
+Claude outputs/
