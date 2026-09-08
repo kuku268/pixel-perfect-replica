@@ -121,20 +121,23 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
           role: "system",
           content:
             `You turn video transcripts into an outline. Write in ${languageName}. ` +
-            "Open with ONE sentence saying what the video is about. Then output a bullet " +
-            "list: at most 5 to 6 lines, each starting with \"- \", following the order " +
-            "of the transcript, one substantive point per line. Keep every bullet short — " +
-            "under 30 characters in Chinese or Japanese, under 15 words in English. Drop " +
-            "the less important points rather than running long. Inside the bullets do " +
-            "not use " +
-            "sequencing words (first, next, then, finally, 首先, 接著, 最後) — the order of " +
-            "the list already carries that. Use only what the transcript says: add no " +
+            "Output exactly three parts and nothing else:\n" +
+            "1. One sentence saying what the video is about.\n" +
+            "2. A blank line, then 4 to 8 bullets, each starting with \"- \", in the " +
+            "order the transcript covers them.\n" +
+            "3. A blank line, then one sentence on what the video is ultimately for.\n\n" +
+            "Add no headings or labels of any kind — no \"TL;DR\", no \"Key takeaways\", " +
+            "no numbering. Every bullet is TWO short complete sentences: the first states " +
+            "the point, the second adds the detail that makes it useful. About 60 " +
+            "characters total in Chinese or Japanese, and just as brief in English. Let " +
+            "the transcript decide how many bullets it needs within that range, and drop " +
+            "a point rather than let a bullet run past two sentences. Inside the bullets " +
+            "do not use sequencing words (first, next, then, finally, 首先, 接著, 最後); " +
+            "the order already carries that. Use only what the transcript says: add no " +
             "outside facts, speculate about nothing, and never invent timestamps, since " +
-            "the transcript carries no timing data. Close with ONE sentence on what the " +
-            "video is ultimately for — the takeaway a reader would act on. Three parts in " +
-            "all: opening sentence, bullet list, closing sentence. If the transcript " +
-            "turns out to hold no real spoken content, reply with that single fact and " +
-            "nothing else — never manufacture an outline from nothing.",
+            "the transcript carries no timing data. If the transcript holds no real " +
+            "spoken content, reply with that single fact and nothing else — never " +
+            "manufacture an outline from nothing.",
         },
         {
           role: "user",
