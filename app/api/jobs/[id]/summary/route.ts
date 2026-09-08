@@ -12,6 +12,31 @@ const MODEL = process.env.OPENAI_SUMMARY_MODEL ?? "gpt-4o-mini";
 // substance, and this keeps the request well inside the context window.
 const MAX_TRANSCRIPT_CHARS = 40000;
 
+// Handed speech-free audio (music, silence, room tone), Whisper does not return
+// nothing — it returns subtitle-credit boilerplate it saw during training, e.g.
+// "字幕by索兰娅". Summarising that produces a confident, entirely invented
+// outline, so refuse before spending a request on it.
+const MIN_TRANSCRIPT_CHARS = 80;
+
+const HALLUCINATION_PATTERNS = [
+  /字幕\s*by/i,
+  /字幕製作|字幕组|字幕組/,
+  /請不吝點贊|订阅|訂閱/,
+  /amara\.org/i,
+  /thanks?\s+for\s+watching/i,
+  /subtitles?\s+by/i,
+  /transcri(bed|ption)\s+by/i,
+];
+
+function hasUsableSpeech(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < MIN_TRANSCRIPT_CHARS) return false;
+  // Boilerplate that accounts for most of the output means there is no content
+  // underneath it; the same phrase inside a long transcript is just a mention.
+  const boilerplate = HALLUCINATION_PATTERNS.some((pattern) => pattern.test(trimmed));
+  return !(boilerplate && trimmed.length < 400);
+}
+
 const LANGUAGE_NAMES: Record<string, string> = {
   zh: "Traditional Chinese",
   en: "English",
@@ -71,6 +96,17 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ summary: session.summary_content, cached: true });
   }
 
+  if (!hasUsableSpeech(session.subtitle_txt_content)) {
+    return NextResponse.json(
+      {
+        error:
+          "No usable speech in this transcript — the audio is probably music or silence, " +
+          "so there is nothing to summarize.",
+      },
+      { status: 422 },
+    );
+  }
+
   const languageName = LANGUAGE_NAMES[job.language] ?? "the same language as the transcript";
   const transcript = session.subtitle_txt_content.slice(0, MAX_TRANSCRIPT_CHARS);
   const truncated = session.subtitle_txt_content.length > MAX_TRANSCRIPT_CHARS;
@@ -97,7 +133,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
             "outside facts, speculate about nothing, and never invent timestamps, since " +
             "the transcript carries no timing data. Close with ONE sentence on what the " +
             "video is ultimately for — the takeaway a reader would act on. Three parts in " +
-            "all: opening sentence, bullet list, closing sentence.",
+            "all: opening sentence, bullet list, closing sentence. If the transcript " +
+            "turns out to hold no real spoken content, reply with that single fact and " +
+            "nothing else — never manufacture an outline from nothing.",
         },
         {
           role: "user",
