@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
+import { SummaryCell } from "@/views/SummaryCell";
 import { UploadForm } from "@/views/UploadForm";
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ type JobRow = {
   created_at: string;
   video_source_url: string;
   status: string;
+  summary_content: string | null;
 };
 
 function relativeTime(iso: string) {
@@ -81,12 +83,39 @@ export default async function UploadPage() {
 
   const { data } = await supabase
     .from("jobs")
-    .select("id, created_at, video_source_url, status")
+    .select("id, created_at, video_source_url, status, current_session_id")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(20);
 
-  const jobs = (data ?? []) as JobRow[];
+  // Fetch the summaries in one follow-up query rather than a PostgREST embedded
+  // select — the relationship-hint syntax is easy to get subtly wrong and only
+  // fails at runtime. RLS already limits job_sessions to this user's rows.
+  const sessionIds = (data ?? [])
+    .map((row) => row.current_session_id)
+    .filter((value): value is string => Boolean(value));
+
+  const summaryBySessionId = new Map<string, string | null>();
+  if (sessionIds.length > 0) {
+    const { data: sessions } = await supabase
+      .from("job_sessions")
+      .select("id, summary_content")
+      .in("id", sessionIds);
+
+    for (const session of sessions ?? []) {
+      summaryBySessionId.set(session.id, session.summary_content);
+    }
+  }
+
+  const jobs: JobRow[] = (data ?? []).map((row) => ({
+    id: row.id,
+    created_at: row.created_at,
+    video_source_url: row.video_source_url,
+    status: row.status,
+    summary_content: row.current_session_id
+      ? (summaryBySessionId.get(row.current_session_id) ?? null)
+      : null,
+  }));
 
   return (
     <div className="min-h-screen bg-hero">
@@ -122,6 +151,7 @@ export default async function UploadPage() {
                     <TableHead>URL</TableHead>
                     <TableHead className="w-32">Status</TableHead>
                     <TableHead className="w-28">Transcript</TableHead>
+                    <TableHead className="w-32">Summary</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -153,6 +183,13 @@ export default async function UploadPage() {
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <SummaryCell
+                          jobId={job.id}
+                          status={job.status}
+                          initialSummary={job.summary_content}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
