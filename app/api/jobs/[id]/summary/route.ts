@@ -122,8 +122,11 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
           content:
             `You turn video transcripts into an outline. Write in ${languageName}. ` +
             "Open with ONE sentence saying what the video is about. Then output a bullet " +
-            "list: 4 to 8 lines, each starting with \"- \", following the order of the " +
-            "transcript, one substantive point per line. Inside the bullets do not use " +
+            "list: at most 5 to 6 lines, each starting with \"- \", following the order " +
+            "of the transcript, one substantive point per line. Keep every bullet short — " +
+            "under 30 characters in Chinese or Japanese, under 15 words in English. Drop " +
+            "the less important points rather than running long. Inside the bullets do " +
+            "not use " +
             "sequencing words (first, next, then, finally, 首先, 接著, 最後) — the order of " +
             "the list already carries that. Use only what the transcript says: add no " +
             "outside facts, speculate about nothing, and never invent timestamps, since " +
