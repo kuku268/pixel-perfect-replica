@@ -16,7 +16,7 @@ export function PurchaseSuccess() {
   useEffect(() => {
     let attempts = 0;
     let first: number | null = null;
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function poll() {
       attempts += 1;
@@ -39,7 +39,9 @@ export function PurchaseSuccess() {
     }
 
     void poll();
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   return (

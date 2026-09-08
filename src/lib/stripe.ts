@@ -6,7 +6,8 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY is required");
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  // Pin so a future SDK bump can't silently change response shapes.
-  apiVersion: "2026-03-25.dahlia",
-});
+// No explicit apiVersion: stripe-node's type for it is the single string that
+// ships with the installed minor, so pinning it by hand breaks the build on
+// every monthly SDK bump. The ^22 range in package.json already pins the API
+// version line — that is the real safeguard.
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);

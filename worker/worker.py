@@ -1,6 +1,7 @@
 """
-M1 worker: handles one job — downloads the media, runs Whisper, writes the TXT
-back to job_sessions.subtitle_txt_content.
+M1/M2 worker: handles one job — downloads the media, runs Whisper, writes the
+TXT back to job_sessions.subtitle_txt_content, and (M2) meters credits:
+1 credit per started minute, checked before Whisper and deducted on done.
 
 Started by distributor.py (one Popen per pending job); reads JOB_ID from env.
 OPENAI_API_KEY / SUPABASE_URL / SUPABASE_SECRET_KEY come from AWS Secrets
@@ -115,6 +116,77 @@ def get_duration_seconds(audio_path: Path) -> float:
     return float(out.stdout.strip())
 
 
+# ---- M2: credit metering -------------------------------------------------
+
+def minutes_from_seconds(seconds: float) -> int:
+    # Always round UP, minimum 1: a 61-second clip is 2 credits. Never round
+    # down or users can game it with just-under-60s clips.
+    return max(1, math.ceil(seconds / 60))
+
+
+def probe_duration_minutes_cheap(video_url: str) -> int | None:
+    """Duration WITHOUT downloading, via the source's manifest.
+
+    Returns None when the source doesn't expose it — yt-dlp prints the literal
+    string 'NA' for direct mp4/mp3 URLs (CloudFront, S3, archive.org files).
+    float('NA') would raise and crash the worker, so None means "decide after
+    download with ffprobe", not an error.
+    """
+    if not video_url.startswith(("http://", "https://")):
+        return None
+    try:
+        out = subprocess.run(
+            ["yt-dlp", "--print", "duration", "--no-warnings", "--no-download", video_url],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return None
+    if not out or out.upper() == "NA":
+        return None
+    try:
+        return minutes_from_seconds(float(out))
+    except ValueError:
+        return None
+
+
+def get_balance(user_id: str) -> float:
+    row = db.table("profiles").select("credits_balance").eq("id", user_id).single().execute().data
+    return float(row["credits_balance"])
+
+
+def mark_insufficient(job_id: str, user_id: str, minutes: int, balance: float) -> None:
+    """Terminal state: no Whisper call, nothing deducted, one zero-amount ledger
+    row so the user can see WHY in /credits history."""
+    update_job(job_id, status="insufficient_credits")
+    db.table("credit_transactions").insert({
+        "user_id": user_id,
+        "amount": 0,
+        "type": "deduction",
+        "description": f"Insufficient credits: video is {minutes} min, you have {int(balance)}",
+        "job_id": job_id,
+    }).execute()
+    print(f"[{job_id}] insufficient_credits — needs {minutes}, has {int(balance)}", flush=True)
+
+
+def deduct_credits(job_id: str, user_id: str, minutes: int) -> None:
+    """Ledger row first (source of truth), then the derived balance.
+    Read-then-write is acceptable for M2: the distributor runs one worker per
+    job, so the same user is never deducted concurrently."""
+    db.table("credit_transactions").insert({
+        "user_id": user_id,
+        "amount": -minutes,
+        "type": "deduction",
+        "description": f"Transcribed {minutes} min video",
+        "job_id": job_id,
+    }).execute()
+    new_balance = max(0.0, get_balance(user_id) - minutes)
+    db.table("profiles").update({"credits_balance": new_balance}).eq("id", user_id).execute()
+    print(f"[{job_id}] deducted {minutes} credit(s) — balance now {int(new_balance)}", flush=True)
+
+
 def split_chunks(mp3_path: Path, dest_dir: Path) -> list[Path]:
     duration = get_duration_seconds(mp3_path)
     n_chunks = max(1, math.ceil(duration / CHUNK_SECONDS))
@@ -159,17 +231,35 @@ def main() -> None:
     job = get_job(job_id)
     session_id = job["current_session_id"]
 
+    # Claim FIRST. If anything below crashes, the job sits in 'downloading'
+    # instead of 'pending', so the distributor doesn't respawn it in a loop.
     update_job(job_id, status="downloading")
     print(f"[{job_id}] downloading {job['video_source_url']}", flush=True)
+
+    user_id = job["user_id"]
+    balance = get_balance(user_id)
+
+    # Gate 1 (free): manifest-based duration, no bytes downloaded.
+    minutes = probe_duration_minutes_cheap(job["video_source_url"])
+    if minutes is not None and minutes > balance:
+        mark_insufficient(job_id, user_id, minutes, balance)
+        return
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         video = download_video(job["video_source_url"], tmp_path)
         mp3 = to_mp3(video, tmp_path)
 
+        # Gate 2 (precise): ffprobe on the actual audio. Also covers the 'NA'
+        # case where Gate 1 couldn't read a duration.
+        minutes = minutes_from_seconds(get_duration_seconds(mp3))
+        if minutes > balance:
+            mark_insufficient(job_id, user_id, minutes, balance)
+            return
+
         update_job(job_id, status="transcribe")
         chunks = split_chunks(mp3, tmp_path)
-        print(f"[{job_id}] transcribing {len(chunks)} chunk(s)", flush=True)
+        print(f"[{job_id}] transcribing {len(chunks)} chunk(s) — {minutes} credit(s)", flush=True)
 
         prompt = build_whisper_prompt(job.get("topic"))
         full_text = "\n\n".join(
@@ -177,6 +267,8 @@ def main() -> None:
         )
 
         update_session(session_id, subtitle_txt_content=full_text)
+        # Deduct only on success: a failed job (any exception above) costs nothing.
+        deduct_credits(job_id, user_id, minutes)
         update_job(job_id, status="done")
 
     print(f"[{job_id}] done — {len(full_text)} chars", flush=True)
@@ -186,9 +278,10 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        # M1 has no error status (the jobs.status check constraint only allows
-        # pending/downloading/transcribe/done) and no retry. A failed job just
-        # stops moving, so make the reason loud in /var/log/m1-distributor.log.
+        # There is still no 'error' status (jobs.status allows pending /
+        # downloading / transcribe / done / insufficient_credits) and no retry.
+        # A failed job just stops moving — and is never charged — so make the
+        # reason loud in /var/log/m1-distributor.log.
         print(f"[{os.environ.get('JOB_ID', '?')}] FAILED", file=sys.stderr, flush=True)
         traceback.print_exc()
         sys.exit(1)

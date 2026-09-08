@@ -47,9 +47,11 @@ function truncate(value: string, max = 50) {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }
 
-// pending / downloading -> muted, transcribe -> accent, done -> primary (forest green).
+// pending / downloading -> muted, transcribe -> accent, done -> primary (forest green),
+// insufficient_credits -> destructive (M2 terminal state; buy credits and resubmit).
 function statusClasses(status: string) {
   if (status === "done") return "bg-primary/12 text-primary";
+  if (status === "insufficient_credits") return "bg-destructive/12 text-destructive";
   if (status === "transcribe") return "bg-accent text-accent-foreground";
   return "bg-muted text-muted-foreground";
 }

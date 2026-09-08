@@ -37,3 +37,11 @@ next-env.d.ts
 # Session scratch
 *.patch
 Claude outputs/
+
+# Python
+__pycache__/
+*.pyc
+
+# Session scratch
+*.patch
+Claude outputs/
