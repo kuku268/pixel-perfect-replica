@@ -80,7 +80,7 @@ export function SummaryCell({
           <DialogHeader>
             <DialogTitle className="font-display text-2xl text-primary">Summary</DialogTitle>
             <DialogDescription>
-              Generated from the transcript by OpenAI. Job {jobId.slice(0, 8)}.
+              Cached after first generation — open again any time at no cost.
             </DialogDescription>
           </DialogHeader>
           <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">

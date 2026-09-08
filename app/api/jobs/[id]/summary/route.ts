@@ -88,11 +88,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         {
           role: "system",
           content:
-            `You summarise video transcripts. Write in ${languageName}. ` +
-            "Open with one sentence saying what the video is about, then give 3-6 bullet " +
-            "points covering the main ideas in the order they appear. Keep the whole thing " +
-            "under 250 words. Use only what the transcript says — do not add outside facts, " +
-            "and do not speculate about anything it leaves unclear.",
+            `You turn video transcripts into an outline. Write in ${languageName}. ` +
+            "Output ONLY a bullet list: 4 to 8 lines, each starting with \"- \", following " +
+            "the order of the transcript. One substantive point per line. Do not open with " +
+            "a summary sentence, and do not use sequencing words (first, next, then, " +
+            "finally, 首先, 接著, 最後) — the order of the list already carries that. Use " +
+            "only what the transcript says: add no outside facts, speculate about nothing, " +
+            "and never invent timestamps, since the transcript carries no timing data.",
         },
         {
           role: "user",
