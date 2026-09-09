@@ -3,24 +3,38 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-// Reads GET /api/credits on mount. Pass `initialBalance` from a server page to
-// avoid the flash; client pages (the dashboard) just let it load.
-export function CreditsBadge({ initialBalance }: { initialBalance?: number }) {
-  const [balance, setBalance] = useState<number | null>(initialBalance ?? null);
+// Two modes:
+//  - `balance` given (server pages: /upload, /credits) — the value comes from the
+//    server component, so every router.refresh() delivers the fresh number. No
+//    client fetch, and it moves in lockstep with the job status column.
+//  - `balance` omitted (client-only pages: dashboard) — fetch once on mount and
+//    again whenever the tab regains focus.
+export function CreditsBadge({ balance }: { balance?: number }) {
+  const serverDriven = balance !== undefined;
+  const [fetched, setFetched] = useState<number | null>(null);
 
   useEffect(() => {
-    if (initialBalance !== undefined) return;
+    if (serverDriven) return;
     let cancelled = false;
-    fetch("/api/credits", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: { balance?: number } | null) => {
-        if (!cancelled && typeof body?.balance === "number") setBalance(body.balance);
-      })
-      .catch(() => {});
+
+    const load = () => {
+      fetch("/api/credits", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((body: { balance?: number } | null) => {
+          if (!cancelled && typeof body?.balance === "number") setFetched(body.balance);
+        })
+        .catch(() => {});
+    };
+
+    load();
+    window.addEventListener("focus", load);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", load);
     };
-  }, [initialBalance]);
+  }, [serverDriven]);
+
+  const shown = serverDriven ? balance : fetched;
 
   return (
     <Link
@@ -29,8 +43,8 @@ export function CreditsBadge({ initialBalance }: { initialBalance?: number }) {
       title="1 credit = 1 minute of video"
     >
       <span className="text-muted-foreground">Credits</span>
-      <span className="font-semibold tabular-nums text-primary">
-        {balance === null ? "…" : Math.floor(balance)}
+      <span className="font-semibold tabular-nums text-primary transition-colors">
+        {shown === null || shown === undefined ? "…" : Math.floor(shown)}
       </span>
       <span className="text-muted-foreground">· Buy more</span>
     </Link>

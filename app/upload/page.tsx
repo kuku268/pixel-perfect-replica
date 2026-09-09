@@ -89,12 +89,18 @@ export default async function UploadPage() {
 
   if (!user) redirect("/sign-in");
 
-  const { data } = await supabase
-    .from("jobs")
-    .select("id, created_at, video_source_url, status, current_session_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  // Jobs and balance are read in the same render, so the auto-refresh that
+  // moves a row to `done` shows the deducted balance in the same tick.
+  const [{ data }, { data: profile }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("id, created_at, video_source_url, status, current_session_id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase.from("profiles").select("credits_balance").eq("id", user.id).single(),
+  ]);
+  const balance = Number(profile?.credits_balance ?? 0);
 
   // Fetch the summaries in one follow-up query rather than a PostgREST embedded
   // select — the relationship-hint syntax is easy to get subtly wrong and only
@@ -133,7 +139,7 @@ export default async function UploadPage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <BrandMark to="/app" />
           <div className="flex items-center gap-4">
-            <CreditsBadge />
+            <CreditsBadge balance={balance} />
             <Link href="/app" className="text-sm font-medium text-primary hover:underline">
               Dashboard
             </Link>

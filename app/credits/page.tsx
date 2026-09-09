@@ -74,7 +74,7 @@ export default async function CreditsPage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <BrandMark to="/app" />
           <div className="flex items-center gap-4">
-            <CreditsBadge initialBalance={balance} />
+            <CreditsBadge balance={balance} />
             <Link href="/upload" className="text-sm font-medium text-primary hover:underline">
               Upload
             </Link>
