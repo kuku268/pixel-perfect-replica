@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
+import { JobsAutoRefresh } from "@/views/JobsAutoRefresh";
 import { SummaryCell } from "@/views/SummaryCell";
 import { UploadForm } from "@/views/UploadForm";
 
@@ -47,13 +48,17 @@ function truncate(value: string, max = 50) {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }
 
+// A job is still moving until it reaches one of these.
+const TERMINAL_STATUSES = new Set(["done", "insufficient_credits"]);
+
 // pending / downloading -> muted, transcribe -> accent, done -> primary (forest green),
 // insufficient_credits -> destructive (M2 terminal state; buy credits and resubmit).
+// In-flight statuses pulse so it is obvious the row is being watched.
 function statusClasses(status: string) {
   if (status === "done") return "bg-primary/12 text-primary";
   if (status === "insufficient_credits") return "bg-destructive/12 text-destructive";
-  if (status === "transcribe") return "bg-accent text-accent-foreground";
-  return "bg-muted text-muted-foreground";
+  if (status === "transcribe") return "animate-pulse bg-accent text-accent-foreground";
+  return "animate-pulse bg-muted text-muted-foreground";
 }
 
 function DownloadIcon() {
@@ -120,6 +125,8 @@ export default async function UploadPage() {
       : null,
   }));
 
+  const hasActiveJobs = jobs.some((job) => !TERMINAL_STATUSES.has(job.status));
+
   return (
     <div className="min-h-screen bg-hero">
       <header className="border-b border-border/70 bg-background/70 backdrop-blur">
@@ -140,9 +147,12 @@ export default async function UploadPage() {
         </h1>
 
         <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">
-            Your transcriptions
-          </h2>
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">
+              Your transcriptions
+            </h2>
+            <JobsAutoRefresh active={hasActiveJobs} />
+          </div>
 
           {jobs.length === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">
