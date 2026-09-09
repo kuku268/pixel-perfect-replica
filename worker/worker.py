@@ -3,10 +3,17 @@ M1/M2 worker: handles one job — downloads the media, runs Whisper, writes the
 TXT back to job_sessions.subtitle_txt_content, and (M2) meters credits:
 1 credit per started minute, checked before Whisper and deducted on done.
 
-Started by distributor.py (one Popen per pending job); reads JOB_ID from env.
-OPENAI_API_KEY / SUPABASE_URL / SUPABASE_SECRET_KEY come from AWS Secrets
-Manager. The EC2's IAM instance profile grants secretsmanager:GetSecretValue on
-exactly those secret names, so no credentials ever live on disk.
+Reads JOB_ID from env. Two launch paths share this file unchanged:
+
+  M1  distributor.py spawns one Popen per pending job on the EC2. Credentials
+      come from AWS Secrets Manager via the instance profile.
+  M4  lambda_distributor.py launches one Fargate task per pending job and
+      injects OPENAI_API_KEY / SUPABASE_URL / SUPABASE_SECRET_KEY as container
+      env (containerOverrides). The Fargate task role is deliberately minimal
+      (no secretsmanager:GetSecretValue), so env must win when present.
+
+_load_secrets() is therefore env-first with a Secrets Manager fallback: the same
+image runs in both places, and no credentials ever live on disk either way.
 """
 
 import math
@@ -27,7 +34,14 @@ def _get_secret(client, name: str) -> str:
     return client.get_secret_value(SecretId=name)["SecretString"]
 
 
+SECRET_KEYS = ("OPENAI_API_KEY", "SUPABASE_URL", "SUPABASE_SECRET_KEY")
+
+
 def _load_secrets() -> dict[str, str]:
+    # M4 / Fargate: the Lambda distributor injected all three as env vars.
+    if all(os.environ.get(k) for k in SECRET_KEYS):
+        return {k: os.environ[k] for k in SECRET_KEYS}
+    # M1 / EC2: read them from Secrets Manager via the instance profile.
     sm = boto3.client("secretsmanager")
     return {
         "OPENAI_API_KEY": _get_secret(sm, "openai-api-key"),

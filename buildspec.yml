@@ -1,0 +1,14 @@
+# CodeBuild: build the worker image from ./worker and push :latest to ECR.
+# Runs on every push to main (webhook) and on manual start-build.
+# Required project env var: ECR_URI (<acct>.dkr.ecr.<region>.amazonaws.com/subtitle-worker)
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_URI"
+  build:
+    commands:
+      - "docker build -t $ECR_URI:latest ./worker"
+  post_build:
+    commands:
+      - "docker push $ECR_URI:latest"

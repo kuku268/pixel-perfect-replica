@@ -1,0 +1,17 @@
+# CodeBuild-as-courier (Cowork mode): the chat sandbox cannot reach S3, so the
+# build container assembles the Lambda deps layer + handler zip and uploads them.
+# Run with:
+#   codebuild start-build --project-name subtitle-worker-build \
+#     --buildspec-override lambda-build.buildspec.yml \
+#     --environment-variables-override name=ARTIFACTS_BUCKET,value=<bucket>,type=PLAINTEXT
+# Every command is quoted: "--only-binary=:all:" contains ": " which YAML would
+# otherwise parse as a key/value separator.
+version: 0.2
+phases:
+  build:
+    commands:
+      - "python3 -m pip install --quiet --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --target python supabase"
+      - "zip -qr deps-layer.zip python"
+      - "cd worker && zip -q ../handler.zip lambda_distributor.py && cd .."
+      - "aws s3 cp deps-layer.zip s3://${ARTIFACTS_BUCKET}/deps-layer.zip"
+      - "aws s3 cp handler.zip s3://${ARTIFACTS_BUCKET}/handler.zip"
