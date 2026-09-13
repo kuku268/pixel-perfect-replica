@@ -422,7 +422,7 @@ export function TranscriptDialog({
         </div>
 
         {/* body */}
-        <div className="grid min-h-0 grow grid-cols-1 gap-4 md:grid-cols-[236px_minmax(0,1fr)]">
+        <div className="grid min-h-0 grow grid-cols-1 items-start gap-4 overflow-y-auto md:grid-cols-[236px_minmax(0,1fr)]">
           {/* speakers sidebar */}
           <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t("speakers")}</span>
@@ -493,7 +493,7 @@ export function TranscriptDialog({
           </div>
 
           {/* rows */}
-          <div ref={listRef} className="min-h-0 overflow-y-auto rounded-xl border border-border bg-card px-4 py-1 md:max-h-[52vh]">
+          <div ref={listRef} className="min-h-0 rounded-xl border border-border bg-card px-4 py-1 md:max-h-[52vh] md:overflow-y-auto">
             {rows.map((row, k) => {
               const active = k === activeIdx && playing;
               const ov = overrides[String(row.i)];

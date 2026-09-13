@@ -78,11 +78,11 @@ export function JobsTable({ jobs, balance }: { jobs: JobListItem[]; balance: num
           {jobs.map((job) => (
             <TableRow key={job.id}>
               <TableCell className="text-muted-foreground">{relativeTime(job.created_at)}</TableCell>
-              <TableCell className="font-mono text-xs" title={job.source}>
+              <TableCell className="max-w-[16rem] truncate font-mono text-xs" title={job.source}>
                 {truncate(job.source)}
               </TableCell>
               <TableCell>
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClasses(job.status)}`}>
+                <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClasses(job.status)}`}>
                   {statusLabel(job.status)}
                 </span>
                 {job.status === "failed" && job.error_message ? (
@@ -95,7 +95,7 @@ export function JobsTable({ jobs, balance }: { jobs: JobListItem[]; balance: num
               {PRO_TIER_ENABLED ? (
                 <TableCell>
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${
                       job.tier === "pro" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
                     }`}
                   >

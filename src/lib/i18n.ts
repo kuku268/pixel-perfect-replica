@@ -276,7 +276,8 @@ function detect(): Lang {
   } catch {
     /* private mode etc. */
   }
-  return navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+  // Taiwan-first product: Traditional Chinese unless the user toggled EN.
+  return "zh";
 }
 
 type Ctx = { lang: Lang; setLang: (l: Lang) => void };

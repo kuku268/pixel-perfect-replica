@@ -63,7 +63,7 @@ export function DownloadMenu({
   // Flag off → exactly the M4 cell.
   if (!PRO_TIER_ENABLED) {
     return (
-      <a href={txtHref} download className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
+      <a href={txtHref} download className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-primary hover:underline">
         <Download aria-hidden="true" className="size-3.5" />
         .txt
       </a>
@@ -73,7 +73,7 @@ export function DownloadMenu({
   return (
     <div className="flex flex-col gap-0.5">
       <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline focus-visible:outline-none">
+        <DropdownMenuTrigger className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-primary hover:underline focus-visible:outline-none">
           <Download aria-hidden="true" className="size-3.5" />
           {t("download")}
           <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -174,13 +174,13 @@ export function DownloadMenu({
       </DropdownMenu>
 
       {!isPro && !job.unlocking ? (
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
           <Lock aria-hidden="true" className="size-3" />
           {t("speakersLocked")}
         </span>
       ) : null}
       {job.unlocking ? (
-        <span className="inline-flex animate-pulse items-center gap-1 text-xs text-accent-foreground">
+        <span className="inline-flex animate-pulse items-center gap-1 whitespace-nowrap text-xs text-accent-foreground">
           <Loader2 aria-hidden="true" className="size-3 animate-spin" />
           {t("identifying")}
         </span>
