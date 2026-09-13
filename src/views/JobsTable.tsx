@@ -66,7 +66,7 @@ export function JobsTable({ jobs, balance }: { jobs: JobListItem[]; balance: num
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-28">{t("thCreated")}</TableHead>
+            <TableHead className="w-28 whitespace-nowrap">{t("thCreated")}</TableHead>
             <TableHead>{t("thSource")}</TableHead>
             <TableHead className="w-32">{t("thStatus")}</TableHead>
             {PRO_TIER_ENABLED ? <TableHead className="w-24">{t("thPlan")}</TableHead> : null}
@@ -77,7 +77,7 @@ export function JobsTable({ jobs, balance }: { jobs: JobListItem[]; balance: num
         <TableBody>
           {jobs.map((job) => (
             <TableRow key={job.id}>
-              <TableCell className="text-muted-foreground">{relativeTime(job.created_at)}</TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">{relativeTime(job.created_at)}</TableCell>
               <TableCell className="max-w-[16rem] truncate font-mono text-xs" title={job.source}>
                 {truncate(job.source)}
               </TableCell>

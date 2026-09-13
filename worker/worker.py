@@ -100,12 +100,21 @@ s3 = boto3.client("s3")
 # out wrong and stay wrong all the way through to the summary — a real run
 # transcribed "Claude Code" as "Cloud Code" seventeen times.
 #
-# The user's own Topic field is the better hint, so it goes first; this list is
-# the fallback for when they leave it blank.
+# The prompt ALSO sets the punctuation style: Whisper copies whatever the prompt
+# does, and a comma-separated English glossary taught it to write Chinese with
+# spaces and no punctuation at all. So the prompt now opens with one natural
+# sentence in the job's language, fully punctuated (Traditional Chinese for
+# zh/auto), then the user's Topic, then the standing glossary.
 DEFAULT_WHISPER_PROMPT = (
     "Claude Code, Anthropic, GitHub Copilot, Google Jules, Cursor, OpenAI, "
     "codebase, repository, snippet, context window, embedding, prompt, agent"
 )
+
+PROMPT_PREFIX = {
+    "zh": "大家好，歡迎收看今天的節目。我們今天要聊的主題是：",
+    "en": "Hello, and welcome to the show. Today we're talking about: ",
+    "ja": "皆さん、こんにちは。今日のテーマは、",
+}
 
 # The API caps the prompt at 224 tokens and silently ignores the overflow.
 MAX_PROMPT_CHARS = 600
@@ -236,10 +245,20 @@ def split_chunks(mp3_path: Path, dest_dir: Path) -> list[Path]:
     return chunks
 
 
-def build_whisper_prompt(topic: str | None) -> str:
-    """Topic first (it is specific to this video), then the standing glossary."""
+def build_whisper_prompt(topic: str | None, language: str | None = None) -> str:
+    """A punctuated opening sentence in the job's language, then the Topic
+    (specific to this video), then the standing glossary.
+
+    zh and auto both get the Traditional-Chinese opener: KO's recordings are
+    Mandarin with English terms mixed in, and the opener is what makes Whisper
+    emit 「，。？」 instead of space-separated runs.
+    """
+    lang = (language or "auto").strip().lower()
+    key = "zh" if lang in ("zh", "auto", "") else (lang if lang in PROMPT_PREFIX else "en")
+    cjk = key in ("zh", "ja")
     parts = [p.strip() for p in (topic, DEFAULT_WHISPER_PROMPT) if p and p.strip()]
-    return ", ".join(parts)[:MAX_PROMPT_CHARS]
+    body = ("、" if cjk else ", ").join(parts)
+    return (PROMPT_PREFIX[key] + body + ("。" if cjk else "."))[:MAX_PROMPT_CHARS]
 
 
 # ---- credits ---------------------------------------------------------------
@@ -398,7 +417,8 @@ def main() -> None:
                   f"{minutes} min × {rate} = {cost} credit(s)", flush=True)
 
             segments = transcribe_chunks(
-                openai_client, chunks, job.get("language"), build_whisper_prompt(job.get("topic"))
+                openai_client, chunks, job.get("language"),
+                build_whisper_prompt(job.get("topic"), job.get("language")),
             )
 
             session_fields: dict = {

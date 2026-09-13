@@ -322,7 +322,7 @@ export function useT() {
 export function LangToggle({ className = "" }: { className?: string }) {
   const { lang, setLang } = useLang();
   const t = useT();
-  const base = "px-2 py-0.5 text-xs font-medium rounded-md transition-colors";
+  const base = "whitespace-nowrap px-2 py-0.5 text-xs font-medium rounded-md transition-colors";
   return createElement(
     "div",
     { className: `inline-flex items-center rounded-lg border border-border bg-background/60 p-0.5 ${className}`, role: "group", "aria-label": "Language" },
