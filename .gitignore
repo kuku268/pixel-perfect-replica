@@ -46,5 +46,6 @@ __pycache__/
 *.patch
 Claude outputs/
 
+# personal notes / TS incremental build cache
 AIvideo.txt
 tsconfig.tsbuildinfo

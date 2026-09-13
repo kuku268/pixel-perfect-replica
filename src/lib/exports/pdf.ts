@@ -139,14 +139,18 @@ export function buildReportPdf(input: ReportInput): Promise<Buffer> {
       doc.y = Math.max(doc.y, rowY + 14) + 6;
     }
 
-    // Page numbers
+    // Page numbers. Writing inside the bottom margin makes pdfkit open a new
+    // page, so drop the margin to 0 on each page while stamping the footer.
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
+      const savedBottom = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
       doc
         .fillColor(GREY)
         .fontSize(8)
         .text(`${t.page} ${i + 1} / ${range.count}`, left, doc.page.height - 36, { width: contentW, align: "right", lineBreak: false });
+      doc.page.margins.bottom = savedBottom;
     }
 
     doc.end();
