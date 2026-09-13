@@ -1,20 +1,37 @@
 """
-M1/M2 worker: handles one job — downloads the media, runs Whisper, writes the
-TXT back to job_sessions.subtitle_txt_content, and (M2) meters credits:
-1 credit per started minute, checked before Whisper and deducted on done.
+Worker: handles one job — fetches the media, runs Whisper (and, for the
+business tier, AssemblyAI speaker labels), writes the transcript back to
+job_sessions, and meters credits.
 
-Reads JOB_ID from env. Two launch paths share this file unchanged:
+Launch: lambda_distributor.py runs one Fargate task per pending job and injects
+JOB_ID / OPENAI_API_KEY / SUPABASE_URL / SUPABASE_SECRET_KEY as container env.
+Everything else comes from the task definition's env (see step 2 notes):
 
-  M1  distributor.py spawns one Popen per pending job on the EC2. Credentials
-      come from AWS Secrets Manager via the instance profile.
-  M4  lambda_distributor.py launches one Fargate task per pending job and
-      injects OPENAI_API_KEY / SUPABASE_URL / SUPABASE_SECRET_KEY as container
-      env (containerOverrides). The Fargate task role is deliberately minimal
-      (no secretsmanager:GetSecretValue), so env must win when present.
+  PRO_TIER_ENABLED        "true" to run the AssemblyAI branch for tier='pro'
+                          jobs. Default "false" = a pro job is FAILED, never
+                          silently downgraded and charged.
+  AUDIO_BUCKET            S3 bucket holding uploads/* (browser uploads) and
+                          audio/* (pro-tier mp3 kept for the 3-day edit window)
+  PRO_CREDITS_PER_MINUTE  credits per started minute for tier='pro' (default 2;
+                          standard is always 1). A post-hoc unlock (child job
+                          with parent_job_id) charges the DIFFERENCE.
+  AUDIO_RETENTION_DAYS    edit window after a pro job finishes (default 3)
 
-_load_secrets() is therefore env-first with a Secrets Manager fallback: the same
-image runs in both places, and no credentials ever live on disk either way.
+Secrets: OpenAI / Supabase arrive as env from the Lambda; the AssemblyAI key is
+read from Secrets Manager `assemblyai-api-key` on demand (task role policy
+worker-secrets-read) so the Lambda needs no change for the pro tier.
+
+Outcomes (jobs.status):
+  done                  charged
+  insufficient_credits  not charged (zero-amount ledger row explains why)
+  failed                not charged; jobs.error_message says what broke.
+                        Bad uploads (not a media file) land here too.
+Whatever the outcome, a browser-uploaded original in uploads/ is deleted
+before the task exits — the only copy we keep is the pro-tier mp3, and only
+until export or the edit deadline.
 """
+
+from __future__ import annotations
 
 import math
 import os
@@ -22,13 +39,19 @@ import subprocess
 import sys
 import tempfile
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import boto3
 from openai import OpenAI
 from supabase import create_client
 
+from align import assign_speakers, speaker_map
+from transcribe_assemblyai import diarize
+from transcribe_whisper import CHUNK_SECONDS, segments_to_text, transcribe_chunks
+
+
+# ---- config / secrets ------------------------------------------------------
 
 def _get_secret(client, name: str) -> str:
     return client.get_secret_value(SecretId=name)["SecretString"]
@@ -38,10 +61,10 @@ SECRET_KEYS = ("OPENAI_API_KEY", "SUPABASE_URL", "SUPABASE_SECRET_KEY")
 
 
 def _load_secrets() -> dict[str, str]:
-    # M4 / Fargate: the Lambda distributor injected all three as env vars.
+    # Fargate: the Lambda distributor injected all three as env vars.
     if all(os.environ.get(k) for k in SECRET_KEYS):
         return {k: os.environ[k] for k in SECRET_KEYS}
-    # M1 / EC2: read them from Secrets Manager via the instance profile.
+    # EC2 fallback (M1): read them from Secrets Manager via the instance profile.
     sm = boto3.client("secretsmanager")
     return {
         "OPENAI_API_KEY": _get_secret(sm, "openai-api-key"),
@@ -50,13 +73,27 @@ def _load_secrets() -> dict[str, str]:
     }
 
 
+def _assemblyai_key() -> str:
+    """Only fetched when a pro job actually needs it."""
+    if os.environ.get("ASSEMBLYAI_API_KEY"):
+        return os.environ["ASSEMBLYAI_API_KEY"]
+    return _get_secret(boto3.client("secretsmanager"), "assemblyai-api-key")
+
+
+def _flag(name: str, default: str = "false") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+PRO_TIER_ENABLED = _flag("PRO_TIER_ENABLED")
+AUDIO_BUCKET = os.environ.get("AUDIO_BUCKET", "videoreader-artifacts-134580876888")
+PRO_CREDITS_PER_MINUTE = int(os.environ.get("PRO_CREDITS_PER_MINUTE", "2"))
+STANDARD_CREDITS_PER_MINUTE = 1
+AUDIO_RETENTION_DAYS = int(os.environ.get("AUDIO_RETENTION_DAYS", "3"))
+
 _secrets = _load_secrets()
 db = create_client(_secrets["SUPABASE_URL"], _secrets["SUPABASE_SECRET_KEY"])
 openai_client = OpenAI(api_key=_secrets["OPENAI_API_KEY"])
-
-# Whisper rejects uploads over 25 MB. 10 minutes of 64 kbps mono mp3 is ~4.8 MB,
-# so 600-second chunks stay well clear of the limit.
-CHUNK_SECONDS = 600
+s3 = boto3.client("s3")
 
 # Whisper accepts a prompt (~224 tokens) that biases decoding toward the spelling
 # and vocabulary it contains. Without it, near-homophones of product names come
@@ -74,11 +111,24 @@ DEFAULT_WHISPER_PROMPT = (
 MAX_PROMPT_CHARS = 600
 
 
-def _utc_now() -> str:
+class BadMediaError(RuntimeError):
+    """The uploaded bytes are not something ffmpeg can read as audio/video."""
+
+
+class ProTierDisabled(RuntimeError):
+    """A tier='pro' job reached a worker with PRO_TIER_ENABLED=false."""
+
+
+# ---- db helpers ------------------------------------------------------------
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _iso(dt: datetime) -> str:
     # PostgREST sends this straight into the UPDATE, so it has to be a real
-    # timestamp literal. The string "now()" is NOT valid Postgres input and
-    # fails with 'invalid input syntax for type timestamp with time zone'.
-    return datetime.now(timezone.utc).isoformat()
+    # timestamp literal. The string "now()" is NOT valid Postgres input.
+    return dt.isoformat()
 
 
 def get_job(job_id: str) -> dict:
@@ -86,12 +136,19 @@ def get_job(job_id: str) -> dict:
 
 
 def update_job(job_id: str, **fields) -> None:
-    db.table("jobs").update({**fields, "updated_at": _utc_now()}).eq("id", job_id).execute()
+    db.table("jobs").update({**fields, "updated_at": _iso(_utc_now())}).eq("id", job_id).execute()
 
 
 def update_session(session_id: str, **fields) -> None:
     db.table("job_sessions").update(fields).eq("id", session_id).execute()
 
+
+def get_balance(user_id: str) -> float:
+    row = db.table("profiles").select("credits_balance").eq("id", user_id).single().execute().data
+    return float(row["credits_balance"])
+
+
+# ---- media -----------------------------------------------------------------
 
 def download_video(url: str, dest_dir: Path) -> Path:
     """yt-dlp for URLs; pass through for local file paths."""
@@ -100,6 +157,33 @@ def download_video(url: str, dest_dir: Path) -> Path:
         subprocess.run(["yt-dlp", "-o", out_template, url], check=True)
         return next(dest_dir.glob("video.*"))
     return Path(url).expanduser().resolve()
+
+
+def download_s3(key: str, dest: Path) -> Path:
+    s3.download_file(AUDIO_BUCKET, key, str(dest))
+    return dest
+
+
+def delete_s3(key: str | None) -> None:
+    if not key:
+        return
+    try:
+        s3.delete_object(Bucket=AUDIO_BUCKET, Key=key)
+    except Exception as e:  # never let cleanup mask the real outcome
+        print(f"warn: could not delete s3://{AUDIO_BUCKET}/{key}: {e}", flush=True)
+
+
+def probe_is_media(path: Path) -> bool:
+    """True when ffprobe sees at least one audio stream. A renamed text file,
+    an executable, a PDF — anything that is not really media — fails here
+    BEFORE ffmpeg ever decodes it."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a",
+         "-show_entries", "stream=codec_type",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+        check=False, capture_output=True, text=True, timeout=60,
+    )
+    return out.returncode == 0 and "audio" in out.stdout
 
 
 def to_mp3(video_path: Path, dest_dir: Path) -> Path:
@@ -130,77 +214,6 @@ def get_duration_seconds(audio_path: Path) -> float:
     return float(out.stdout.strip())
 
 
-# ---- M2: credit metering -------------------------------------------------
-
-def minutes_from_seconds(seconds: float) -> int:
-    # Always round UP, minimum 1: a 61-second clip is 2 credits. Never round
-    # down or users can game it with just-under-60s clips.
-    return max(1, math.ceil(seconds / 60))
-
-
-def probe_duration_minutes_cheap(video_url: str) -> int | None:
-    """Duration WITHOUT downloading, via the source's manifest.
-
-    Returns None when the source doesn't expose it — yt-dlp prints the literal
-    string 'NA' for direct mp4/mp3 URLs (CloudFront, S3, archive.org files).
-    float('NA') would raise and crash the worker, so None means "decide after
-    download with ffprobe", not an error.
-    """
-    if not video_url.startswith(("http://", "https://")):
-        return None
-    try:
-        out = subprocess.run(
-            ["yt-dlp", "--print", "duration", "--no-warnings", "--no-download", video_url],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        ).stdout.strip()
-    except (subprocess.SubprocessError, OSError):
-        return None
-    if not out or out.upper() == "NA":
-        return None
-    try:
-        return minutes_from_seconds(float(out))
-    except ValueError:
-        return None
-
-
-def get_balance(user_id: str) -> float:
-    row = db.table("profiles").select("credits_balance").eq("id", user_id).single().execute().data
-    return float(row["credits_balance"])
-
-
-def mark_insufficient(job_id: str, user_id: str, minutes: int, balance: float) -> None:
-    """Terminal state: no Whisper call, nothing deducted, one zero-amount ledger
-    row so the user can see WHY in /credits history."""
-    update_job(job_id, status="insufficient_credits")
-    db.table("credit_transactions").insert({
-        "user_id": user_id,
-        "amount": 0,
-        "type": "deduction",
-        "description": f"Insufficient credits: video is {minutes} min, you have {int(balance)}",
-        "job_id": job_id,
-    }).execute()
-    print(f"[{job_id}] insufficient_credits — needs {minutes}, has {int(balance)}", flush=True)
-
-
-def deduct_credits(job_id: str, user_id: str, minutes: int) -> None:
-    """Ledger row first (source of truth), then the derived balance.
-    Read-then-write is acceptable for M2: the distributor runs one worker per
-    job, so the same user is never deducted concurrently."""
-    db.table("credit_transactions").insert({
-        "user_id": user_id,
-        "amount": -minutes,
-        "type": "deduction",
-        "description": f"Transcribed {minutes} min video",
-        "job_id": job_id,
-    }).execute()
-    new_balance = max(0.0, get_balance(user_id) - minutes)
-    db.table("profiles").update({"credits_balance": new_balance}).eq("id", user_id).execute()
-    print(f"[{job_id}] deducted {minutes} credit(s) — balance now {int(new_balance)}", flush=True)
-
-
 def split_chunks(mp3_path: Path, dest_dir: Path) -> list[Path]:
     duration = get_duration_seconds(mp3_path)
     n_chunks = max(1, math.ceil(duration / CHUNK_SECONDS))
@@ -229,73 +242,220 @@ def build_whisper_prompt(topic: str | None) -> str:
     return ", ".join(parts)[:MAX_PROMPT_CHARS]
 
 
-def transcribe_chunk(chunk_path: Path, language: str, prompt: str) -> str:
-    with open(chunk_path, "rb") as f:
-        return openai_client.audio.transcriptions.create(
-            model="whisper-1",
-            file=f,
-            response_format="text",
-            language=language,
-            prompt=prompt,
-        )
+# ---- credits ---------------------------------------------------------------
+
+def minutes_from_seconds(seconds: float) -> int:
+    # Always round UP, minimum 1: a 61-second clip is 2 credits. Never round
+    # down or users can game it with just-under-60s clips.
+    return max(1, math.ceil(seconds / 60))
+
+
+def probe_duration_minutes_cheap(video_url: str) -> int | None:
+    """Duration WITHOUT downloading, via the source's manifest.
+
+    Returns None when the source doesn't expose it — yt-dlp prints the literal
+    string 'NA' for direct mp4/mp3 URLs (CloudFront, S3, archive.org files).
+    """
+    if not video_url.startswith(("http://", "https://")):
+        return None
+    try:
+        out = subprocess.run(
+            ["yt-dlp", "--print", "duration", "--no-warnings", "--no-download", video_url],
+            check=False, capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return None
+    if not out or out.upper() == "NA":
+        return None
+    try:
+        return minutes_from_seconds(float(out))
+    except ValueError:
+        return None
+
+
+def mark_insufficient(job_id: str, user_id: str, minutes: int, cost: int, balance: float) -> None:
+    """Terminal state: no engine call, nothing deducted, one zero-amount ledger
+    row so the user can see WHY in /credits history."""
+    update_job(job_id, status="insufficient_credits")
+    db.table("credit_transactions").insert({
+        "user_id": user_id,
+        "amount": 0,
+        "type": "deduction",
+        "description": f"Insufficient credits: video is {minutes} min ({cost} credits), you have {int(balance)}",
+        "job_id": job_id,
+    }).execute()
+    print(f"[{job_id}] insufficient_credits — needs {cost}, has {int(balance)}", flush=True)
+
+
+def deduct_credits(job_id: str, user_id: str, minutes: int, cost: int, tx_type: str, label: str) -> None:
+    """Ledger row first (source of truth), then the derived balance.
+    Read-then-write is acceptable: one worker per job, and the same user is
+    never deducted concurrently in practice."""
+    db.table("credit_transactions").insert({
+        "user_id": user_id,
+        "amount": -cost,
+        "type": tx_type,
+        "description": f"{label} {minutes} min video",
+        "job_id": job_id,
+    }).execute()
+    new_balance = max(0.0, get_balance(user_id) - cost)
+    db.table("profiles").update({"credits_balance": new_balance}).eq("id", user_id).execute()
+    print(f"[{job_id}] deducted {cost} credit(s) — balance now {int(new_balance)}", flush=True)
+
+
+# ---- the job ---------------------------------------------------------------
+
+def plan_job(job: dict) -> dict:
+    """Decide tier / rate / source once, up front."""
+    parent = get_job(job["parent_job_id"]) if job.get("parent_job_id") else None
+    is_pro = job.get("tier") == "pro"
+    if is_pro and not PRO_TIER_ENABLED:
+        raise ProTierDisabled("business tier is not enabled on this worker")
+
+    if parent:
+        # post-hoc unlock: the user already paid the standard rate on the
+        # parent, so charge only the difference and reuse the parent's audio.
+        rate = max(0, PRO_CREDITS_PER_MINUTE - STANDARD_CREDITS_PER_MINUTE)
+        tx_type, label = "pro_unlock", "Unlocked business tier for"
+    elif is_pro:
+        rate = PRO_CREDITS_PER_MINUTE
+        tx_type, label = "deduction", "Transcribed (business)"
+    else:
+        rate = STANDARD_CREDITS_PER_MINUTE
+        tx_type, label = "deduction", "Transcribed"
+
+    if parent and parent.get("audio_key"):
+        source = ("audio", parent["audio_key"])
+    elif parent and parent.get("source_kind") == "upload":
+        raise BadMediaError("original upload is gone and no audio copy exists — please re-upload")
+    elif job.get("source_kind") == "upload":
+        if not job.get("upload_key"):
+            raise BadMediaError("upload job has no upload_key")
+        source = ("upload", job["upload_key"])
+    else:
+        source = ("url", (parent or job)["video_source_url"])
+
+    return {"is_pro": is_pro, "parent": parent, "rate": rate,
+            "tx_type": tx_type, "label": label, "source": source}
+
+
+def fetch_audio(job_id: str, source: tuple[str, str], tmp: Path) -> Path:
+    kind, ref = source
+    if kind == "audio":
+        print(f"[{job_id}] reusing s3://{AUDIO_BUCKET}/{ref}", flush=True)
+        return download_s3(ref, tmp / "audio.mp3")
+    if kind == "upload":
+        print(f"[{job_id}] fetching upload s3://{AUDIO_BUCKET}/{ref}", flush=True)
+        raw = download_s3(ref, tmp / "upload.bin")
+        if not probe_is_media(raw):
+            raise BadMediaError("uploaded file is not a readable audio/video file")
+        return to_mp3(raw, tmp)
+    print(f"[{job_id}] downloading {ref}", flush=True)
+    return to_mp3(download_video(ref, tmp), tmp)
 
 
 def main() -> None:
     job_id = os.environ["JOB_ID"]
     job = get_job(job_id)
     session_id = job["current_session_id"]
-
-    # Claim FIRST. If anything below crashes, the job sits in 'downloading'
-    # instead of 'pending', so the distributor doesn't respawn it in a loop.
-    update_job(job_id, status="downloading")
-    print(f"[{job_id}] downloading {job['video_source_url']}", flush=True)
-
     user_id = job["user_id"]
-    balance = get_balance(user_id)
+    upload_key = job.get("upload_key") if job.get("source_kind") == "upload" else None
 
-    # Gate 1 (free): manifest-based duration, no bytes downloaded.
-    minutes = probe_duration_minutes_cheap(job["video_source_url"])
-    if minutes is not None and minutes > balance:
-        mark_insufficient(job_id, user_id, minutes, balance)
-        return
+    # Claim FIRST so a crash below leaves the job in 'downloading'/'failed',
+    # never back in 'pending' for the distributor to respawn in a loop.
+    update_job(job_id, status="downloading")
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        video = download_video(job["video_source_url"], tmp_path)
-        mp3 = to_mp3(video, tmp_path)
+    try:
+        plan = plan_job(job)
+        rate = plan["rate"]
+        balance = get_balance(user_id)
 
-        # Gate 2 (precise): ffprobe on the actual audio. Also covers the 'NA'
-        # case where Gate 1 couldn't read a duration.
-        minutes = minutes_from_seconds(get_duration_seconds(mp3))
-        if minutes > balance:
-            mark_insufficient(job_id, user_id, minutes, balance)
-            return
+        # Gate 1 (free): manifest-based duration, no bytes downloaded.
+        if plan["source"][0] == "url":
+            minutes = probe_duration_minutes_cheap(plan["source"][1])
+            if minutes is not None and minutes * rate > balance:
+                mark_insufficient(job_id, user_id, minutes, minutes * rate, balance)
+                return
 
-        update_job(job_id, status="transcribe")
-        chunks = split_chunks(mp3, tmp_path)
-        print(f"[{job_id}] transcribing {len(chunks)} chunk(s) — {minutes} credit(s)", flush=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            mp3 = fetch_audio(job_id, plan["source"], tmp_path)
+            # The browser upload has served its purpose the moment we have an
+            # mp3; nothing below needs it and we never keep originals.
+            delete_s3(upload_key)
+            upload_key = None
 
-        prompt = build_whisper_prompt(job.get("topic"))
-        full_text = "\n\n".join(
-            transcribe_chunk(c, job["language"], prompt) for c in chunks
-        )
+            # Gate 2 (precise): ffprobe on the actual audio.
+            minutes = minutes_from_seconds(get_duration_seconds(mp3))
+            cost = minutes * rate
+            if cost > balance:
+                mark_insufficient(job_id, user_id, minutes, cost, balance)
+                return
 
-        update_session(session_id, subtitle_txt_content=full_text)
-        # Deduct only on success: a failed job (any exception above) costs nothing.
-        deduct_credits(job_id, user_id, minutes)
-        update_job(job_id, status="done")
+            update_job(job_id, status="transcribe")
+            chunks = split_chunks(mp3, tmp_path)
+            print(f"[{job_id}] whisper: {len(chunks)} chunk(s), tier={job.get('tier')}, "
+                  f"{minutes} min × {rate} = {cost} credit(s)", flush=True)
 
-    print(f"[{job_id}] done — {len(full_text)} chars", flush=True)
+            segments = transcribe_chunks(
+                openai_client, chunks, job.get("language"), build_whisper_prompt(job.get("topic"))
+            )
+
+            session_fields: dict = {
+                "subtitle_txt_content": segments_to_text(segments),
+                "engine": "whisper-1",
+            }
+            job_fields: dict = {}
+
+            if plan["is_pro"]:
+                print(f"[{job_id}] assemblyai: speaker labels", flush=True)
+                turns = diarize(_assemblyai_key(), mp3, job.get("language"), job.get("speakers_expected"))
+                segments = assign_speakers(segments, turns)
+                session_fields["speakers"] = speaker_map(segments)
+                session_fields["engine"] = "whisper-1+assemblyai"
+
+                # Keep the mp3 for the in-browser editor until export or deadline.
+                audio_key = plan["parent"]["audio_key"] if plan["parent"] and plan["parent"].get("audio_key") \
+                    else f"audio/{job_id}.mp3"
+                if audio_key == f"audio/{job_id}.mp3":
+                    s3.upload_file(str(mp3), AUDIO_BUCKET, audio_key,
+                                   ExtraArgs={"ContentType": "audio/mpeg"})
+                job_fields["audio_key"] = audio_key
+                job_fields["edit_deadline"] = _iso(_utc_now() + timedelta(days=AUDIO_RETENTION_DAYS))
+
+            session_fields["segments"] = segments
+            update_session(session_id, **session_fields)
+
+            # Deduct only on success: a failed job (any exception above) costs nothing.
+            if cost > 0:
+                deduct_credits(job_id, user_id, minutes, cost, plan["tx_type"], plan["label"])
+            update_job(job_id, status="done", **job_fields)
+
+            # Post-hoc unlock: fold the result back onto the parent so the
+            # web app reads one job, and the child is just the work record.
+            if plan["parent"]:
+                parent = plan["parent"]
+                update_job(parent["id"], tier="pro",
+                           formats=sorted(set(parent.get("formats") or []) | set(job.get("formats") or [])),
+                           **job_fields)
+                if parent.get("current_session_id"):
+                    update_session(parent["current_session_id"], **session_fields)
+
+        print(f"[{job_id}] done — {len(segments)} segments", flush=True)
+
+    except Exception as e:
+        # Terminal, never charged. Message is for the job list ("why did it fail").
+        reason = f"{type(e).__name__}: {e}"[:500]
+        update_job(job_id, status="failed", error_message=reason)
+        print(f"[{job_id}] FAILED {reason}", file=sys.stderr, flush=True)
+        raise
+    finally:
+        delete_s3(upload_key)  # no-op when already deleted / not an upload
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception:
-        # There is still no 'error' status (jobs.status allows pending /
-        # downloading / transcribe / done / insufficient_credits) and no retry.
-        # A failed job just stops moving — and is never charged — so make the
-        # reason loud in /var/log/m1-distributor.log.
-        print(f"[{os.environ.get('JOB_ID', '?')}] FAILED", file=sys.stderr, flush=True)
         traceback.print_exc()
         sys.exit(1)

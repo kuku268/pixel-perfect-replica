@@ -7,7 +7,10 @@ EventBridge fires this Lambda every minute. One pass:
   2. for each: make sure a job_sessions row exists AND jobs.current_session_id
      points at it (_ensure_session — the link is the easy-to-miss part)
   3. skip sessions that already carry a fargate_task_arn (idempotency — this
-     Lambda is stateless, so the DB column is the only memory it has)
+     Lambda is stateless, so the DB column is the only memory it has) —
+     UNLESS that task is already STOPPED without the worker ever having run
+     (image pull timeout, ENI failure, …): then the job would sit 'pending'
+     forever, so clear the stamp and let step 4 spawn it again (step 2 fix)
   4. ecs:RunTask one Fargate task for the job, forwarding the three creds
      worker.py needs as container env
   5. stamp job_sessions.fargate_task_arn so the next tick skips it
@@ -88,6 +91,27 @@ def _session_task_arn(session_id: str) -> str | None:
     return (row or {}).get("fargate_task_arn")
 
 
+def _task_died_before_start(task_arn: str) -> str | None:
+    """Reason string when the stamped task is STOPPED and its container never
+    ran (no exit code) — e.g. 'CannotPullContainerError: … i/o timeout' seen
+    on 2026-09-13. None means: still running, or the worker did run (then the
+    worker itself owns the job's status: downloading / failed / done).
+
+    A task ECS no longer remembers (stopped > ~1 h ago) counts as dead too.
+    """
+    resp = ecs.describe_tasks(cluster=ECS_CLUSTER, tasks=[task_arn])
+    tasks = resp.get("tasks") or []
+    if not tasks:
+        return "task no longer known to ECS"
+    task = tasks[0]
+    if task.get("lastStatus") != "STOPPED":
+        return None
+    containers = task.get("containers") or []
+    if containers and containers[0].get("exitCode") is not None:
+        return None  # worker ran and exited; not ours to retry
+    return task.get("stoppedReason") or "stopped before the container started"
+
+
 def _run_task(job_id: str) -> str:
     net = {"subnets": SUBNETS, "assignPublicIp": "ENABLED"}
     if SECURITY_GROUPS:
@@ -121,7 +145,7 @@ def _run_task(job_id: str) -> str:
 
 def spawn_pending() -> dict:
     pending = db.table("jobs").select("id").eq("status", "pending").execute().data
-    spawned, skipped, errors = 0, 0, 0
+    spawned, skipped, respawned, errors = 0, 0, 0, 0
 
     for job in pending:
         job_id = job["id"]
@@ -130,9 +154,14 @@ def spawn_pending() -> dict:
             break
         try:
             session_id = _ensure_session(job_id)
-            if _session_task_arn(session_id):
-                skipped += 1
-                continue
+            stamped = _session_task_arn(session_id)
+            if stamped:
+                reason = _task_died_before_start(stamped)
+                if reason is None:
+                    skipped += 1
+                    continue
+                _log(f"[{job_id}] previous task died before start ({reason[:120]}) — respawning")
+                respawned += 1
             arn = _run_task(job_id)
             db.table("job_sessions").update({"fargate_task_arn": arn}).eq("id", session_id).execute()
             spawned += 1
@@ -141,7 +170,8 @@ def spawn_pending() -> dict:
             errors += 1
             _log(f"[{job_id}] ERROR {e}")
 
-    summary = {"pending": len(pending), "spawned": spawned, "skipped": skipped, "errors": errors}
+    summary = {"pending": len(pending), "spawned": spawned, "skipped": skipped,
+               "respawned": respawned, "errors": errors}
     _log(f"tick {summary}")
     return summary
 
