@@ -47,6 +47,7 @@ from openai import OpenAI
 from supabase import create_client
 
 from align import assign_speakers, speaker_map
+from punctuate import needs_punctuation, punctuate
 from transcribe_assemblyai import diarize
 from transcribe_whisper import CHUNK_SECONDS, segments_to_text, transcribe_chunks
 
@@ -420,6 +421,12 @@ def main() -> None:
                 openai_client, chunks, job.get("language"),
                 build_whisper_prompt(job.get("topic"), job.get("language")),
             )
+
+            # Whisper leaves Taiwan Mandarin unpunctuated; a small chat model
+            # adds 「，。？」 without touching a single character (see punctuate.py).
+            if needs_punctuation(segments, job.get("language")):
+                segments, changed = punctuate(openai_client, segments)
+                print(f"[{job_id}] punctuate: {changed}/{len(segments)} lines", flush=True)
 
             session_fields: dict = {
                 "subtitle_txt_content": segments_to_text(segments),

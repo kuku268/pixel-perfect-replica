@@ -10,7 +10,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY worker.py transcribe_whisper.py transcribe_assemblyai.py align.py ./
+COPY worker.py transcribe_whisper.py transcribe_assemblyai.py align.py punctuate.py ./
 
 # ffmpeg/ffprobe decode user-supplied files (local uploads from Step 3). Run as
 # an unprivileged user so a decoder bug cannot touch anything outside /app and
