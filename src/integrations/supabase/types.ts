@@ -88,25 +88,40 @@ export type Database = {
       job_sessions: {
         Row: {
           created_at: string
+          engine: string | null
+          fargate_task_arn: string | null
           id: string
           job_id: string
+          overrides: Json | null
+          segments: Json | null
           session_number: number
+          speakers: Json | null
           subtitle_txt_content: string | null
           summary_content: string | null
         }
         Insert: {
           created_at?: string
+          engine?: string | null
+          fargate_task_arn?: string | null
           id?: string
           job_id: string
+          overrides?: Json | null
+          segments?: Json | null
           session_number?: number
+          speakers?: Json | null
           subtitle_txt_content?: string | null
           summary_content?: string | null
         }
         Update: {
           created_at?: string
+          engine?: string | null
+          fargate_task_arn?: string | null
           id?: string
           job_id?: string
+          overrides?: Json | null
+          segments?: Json | null
           session_number?: number
+          speakers?: Json | null
           subtitle_txt_content?: string | null
           summary_content?: string | null
         }
@@ -122,35 +137,68 @@ export type Database = {
       }
       jobs: {
         Row: {
+          audio_key: string | null
           created_at: string
           current_session_id: string | null
+          edit_deadline: string | null
+          error_message: string | null
+          exported_at: string | null
+          formats: string[]
           id: string
           language: string
+          original_filename: string | null
+          parent_job_id: string | null
+          source_kind: string
+          speakers_expected: number | null
           status: string
+          tier: string
           topic: string | null
           updated_at: string
+          upload_key: string | null
           user_id: string
           video_source_url: string
         }
         Insert: {
+          audio_key?: string | null
           created_at?: string
           current_session_id?: string | null
+          edit_deadline?: string | null
+          error_message?: string | null
+          exported_at?: string | null
+          formats?: string[]
           id?: string
           language?: string
+          original_filename?: string | null
+          parent_job_id?: string | null
+          source_kind?: string
+          speakers_expected?: number | null
           status?: string
+          tier?: string
           topic?: string | null
           updated_at?: string
+          upload_key?: string | null
           user_id: string
           video_source_url: string
         }
         Update: {
+          audio_key?: string | null
           created_at?: string
           current_session_id?: string | null
+          edit_deadline?: string | null
+          error_message?: string | null
+          exported_at?: string | null
+          formats?: string[]
           id?: string
           language?: string
+          original_filename?: string | null
+          parent_job_id?: string | null
+          source_kind?: string
+          speakers_expected?: number | null
           status?: string
+          tier?: string
           topic?: string | null
           updated_at?: string
+          upload_key?: string | null
           user_id?: string
           video_source_url?: string
         }
@@ -160,6 +208,13 @@ export type Database = {
             columns: ["current_session_id"]
             isOneToOne: false
             referencedRelation: "job_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_parent_job_id_fkey"
+            columns: ["parent_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]

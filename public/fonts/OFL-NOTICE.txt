@@ -1,0 +1,6 @@
+NotoSansTC-Regular.subset.otf is a glyph subset of Noto Sans CJK TC (Regular),
+Copyright Google/Adobe, licensed under the SIL Open Font License 1.1
+(https://openfontlicense.org). It is embedded into the .pdf report export.
+Subset ranges: Basic Latin, Latin-1, general punctuation, CJK symbols,
+Bopomofo, CJK Unified Ideographs (U+4E00–U+9FFF), CJK compatibility forms,
+halfwidth/fullwidth forms.

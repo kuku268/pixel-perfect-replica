@@ -45,3 +45,6 @@ __pycache__/
 # Session scratch
 *.patch
 Claude outputs/
+
+AIvideo.txt
+tsconfig.tsbuildinfo
