@@ -43,6 +43,11 @@ export default function SignIn() {
       submitLabel="Sign in / 登入"
       pending={pending}
       onSubmit={handleSubmit}
+      passwordHint={
+        <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+          Forgot password? / 忘記密碼
+        </Link>
+      }
       footer={
         <>
           Don't have an account?{" "}

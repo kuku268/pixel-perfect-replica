@@ -11,6 +11,7 @@ export function AuthCard({
   pending,
   onSubmit,
   footer,
+  passwordHint,
 }: {
   heading: string;
   subheading: string;
@@ -18,6 +19,7 @@ export function AuthCard({
   pending: boolean;
   onSubmit: (email: string, password: string) => void | Promise<void>;
   footer: ReactNode;
+  passwordHint?: ReactNode;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,7 +54,10 @@ export function AuthCard({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {passwordHint}
+              </div>
               <Input
                 id="password"
                 type="password"
