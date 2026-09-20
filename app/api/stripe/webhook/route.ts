@@ -69,6 +69,7 @@ export async function POST(request: Request) {
     amount: credits,
     type: "purchase",
     description: `Purchased ${credits} credits`,
+    provider: "stripe",
     stripe_payment_intent_id: paymentIntentId,
   });
 

@@ -36,7 +36,16 @@ function typeClasses(type: string) {
   return "bg-muted text-muted-foreground";
 }
 
-export default async function CreditsPage() {
+function twd(value: number) {
+  return `NT$${value.toLocaleString("en-US")}`;
+}
+
+export default async function CreditsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payment?: string }>;
+}) {
+  const { payment } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -47,7 +56,7 @@ export default async function CreditsPage() {
     supabase.from("profiles").select("credits_balance").eq("id", user.id).single(),
     supabase
       .from("credit_products")
-      .select("id, name, credits, price_usd, stripe_price_id")
+      .select("id, name, credits, price_usd, price_twd, stripe_price_id")
       .eq("active", true)
       .order("price_usd"),
     supabase
@@ -84,6 +93,15 @@ export default async function CreditsPage() {
 
       <main className="mx-auto max-w-5xl px-5 py-14">
         <h1 className="font-display text-4xl font-semibold tracking-tight text-primary">Credits</h1>
+
+        {payment === "failed" ? (
+          <p
+            role="alert"
+            className="mt-6 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            付款未完成，沒有扣款也沒有加點。Payment was not completed — nothing was charged.
+          </p>
+        ) : null}
 
         {/* Balance */}
         <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-card">
@@ -127,15 +145,24 @@ export default async function CreditsPage() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     {usd(ratio)} per credit · {credits} minutes of video
                   </p>
-                  <div className="mt-6">
+                  <div className="mt-6 space-y-2">
                     <BuyCreditsButton productId={tier.id} label={`Buy ${credits} credits`} />
+                    {tier.price_twd ? (
+                      <BuyCreditsButton
+                        productId={tier.id}
+                        provider="ecpay"
+                        variant="outline"
+                        label={`綠界付款 ${twd(Number(tier.price_twd))}`}
+                      />
+                    ) : null}
                   </div>
                 </div>
               );
             })}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Payments are processed by Stripe. Test mode: use card 4242 4242 4242 4242.
+            Payments are processed by Stripe (USD) or ECPay 綠界 (NT$). Test mode: Stripe card 4242
+            4242 4242 4242; ECPay card 4311 9522 2222 2222, any CVV, SMS code 1234.
           </p>
         </section>
 

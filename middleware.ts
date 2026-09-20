@@ -34,9 +34,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip Next internals, static assets, and the Stripe webhook. Stripe has no
-    // auth cookie, and running auth.getUser() on that request would either 307
-    // it or mutate the body the signature was computed over.
-    "/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Skip Next internals, static assets, and the payment callbacks (Stripe
+    // webhook, ECPay notify + browser result). They carry no auth cookie, and
+    // running auth.getUser() on them could 307 the request or touch the body
+    // the signature was computed over.
+    "/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|api/ecpay/notify|api/ecpay/result|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

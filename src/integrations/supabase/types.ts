@@ -21,6 +21,7 @@ export type Database = {
           credits: number
           id: string
           name: string
+          price_twd: number | null
           price_usd: number
           stripe_price_id: string | null
         }
@@ -30,6 +31,7 @@ export type Database = {
           credits: number
           id?: string
           name: string
+          price_twd?: number | null
           price_usd: number
           stripe_price_id?: string | null
         }
@@ -39,6 +41,7 @@ export type Database = {
           credits?: number
           id?: string
           name?: string
+          price_twd?: number | null
           price_usd?: number
           stripe_price_id?: string | null
         }
@@ -51,6 +54,8 @@ export type Database = {
           description: string | null
           id: string
           job_id: string | null
+          ecpay_merchant_trade_no: string | null
+          provider: string | null
           stripe_payment_intent_id: string | null
           type: string
           user_id: string
@@ -61,6 +66,8 @@ export type Database = {
           description?: string | null
           id?: string
           job_id?: string | null
+          ecpay_merchant_trade_no?: string | null
+          provider?: string | null
           stripe_payment_intent_id?: string | null
           type: string
           user_id: string
@@ -71,6 +78,8 @@ export type Database = {
           description?: string | null
           id?: string
           job_id?: string | null
+          ecpay_merchant_trade_no?: string | null
+          provider?: string | null
           stripe_payment_intent_id?: string | null
           type?: string
           user_id?: string
@@ -81,6 +90,56 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ecpay_orders: {
+        Row: {
+          amount_twd: number
+          created_at: string
+          credits: number
+          ecpay_trade_no: string | null
+          merchant_trade_no: string
+          notify_payload: Json | null
+          paid_at: string | null
+          product_id: string
+          rtn_code: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount_twd: number
+          created_at?: string
+          credits: number
+          ecpay_trade_no?: string | null
+          merchant_trade_no: string
+          notify_payload?: Json | null
+          paid_at?: string | null
+          product_id: string
+          rtn_code?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount_twd?: number
+          created_at?: string
+          credits?: number
+          ecpay_trade_no?: string | null
+          merchant_trade_no?: string
+          notify_payload?: Json | null
+          paid_at?: string | null
+          product_id?: string
+          rtn_code?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ecpay_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "credit_products"
             referencedColumns: ["id"]
           },
         ]
@@ -248,7 +307,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ecpay_mark_paid: {
+        Args: {
+          p_amount: number
+          p_ecpay_trade_no: string
+          p_merchant_trade_no: string
+          p_payload: Json
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
