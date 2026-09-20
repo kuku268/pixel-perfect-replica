@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { BrandMark } from "@/components/BrandMark";
 import { Button } from "@/components/ui/button";
-import { LangProvider, LangToggle, useT } from "@/lib/i18n";
+import { LangProvider, useT } from "@/lib/i18n";
 
 // The webhook is the only thing that credits. This page just waits for the
 // balance to move so the redirect back from Stripe doesn't feel like nothing
@@ -59,7 +59,6 @@ function PurchaseSuccessInner() {
       <header className="border-b border-border/70 bg-background/70 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <BrandMark to="/app" />
-          <LangToggle />
         </div>
       </header>
       <main className="mx-auto max-w-xl px-5 py-20 text-center">

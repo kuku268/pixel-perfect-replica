@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { BrandMark } from "@/components/BrandMark";
 import { CreditsBadge } from "@/components/CreditsBadge";
-import { LangProvider, LangToggle } from "@/lib/i18n";
+import { LangProvider } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { JobsAutoRefresh } from "@/views/JobsAutoRefresh";
 import { JobsTable } from "@/views/JobsTable";
@@ -101,7 +101,6 @@ export default async function UploadPage() {
             <BrandMark to="/app" />
             <div className="flex items-center gap-4">
               <CreditsBadge balance={balance} />
-              <LangToggle />
               <Link href="/app" className="whitespace-nowrap text-sm font-medium text-primary hover:underline">
                 <PageStrings k="dashboard" />
               </Link>

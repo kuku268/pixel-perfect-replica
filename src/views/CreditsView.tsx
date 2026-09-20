@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { BrandMark } from "@/components/BrandMark";
 import { CreditsBadge } from "@/components/CreditsBadge";
-import { LangProvider, LangToggle, useLang, useT, type Key, type Lang } from "@/lib/i18n";
+import { LangProvider, useLang, useT, type Key, type Lang } from "@/lib/i18n";
 import { BuyCreditsButton } from "@/views/BuyCreditsButton";
 
 // One layout for both languages; only the words and the payment rail differ:
@@ -106,7 +106,6 @@ function CreditsInner({ balance, tiers, transactions, paymentFailed, stripeTest,
           <BrandMark to="/app" />
           <div className="flex items-center gap-4">
             <CreditsBadge balance={balance} />
-            <LangToggle />
             <Link href="/upload" className="whitespace-nowrap text-sm font-medium text-primary hover:underline">
               {t("navTranscribe")}
             </Link>
