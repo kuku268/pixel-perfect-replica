@@ -5,11 +5,21 @@ import Link from "next/link";
 
 import { BrandMark } from "@/components/BrandMark";
 import { Button } from "@/components/ui/button";
+import { LangProvider, LangToggle, useT } from "@/lib/i18n";
 
 // The webhook is the only thing that credits. This page just waits for the
 // balance to move so the redirect back from Stripe doesn't feel like nothing
 // happened. If the webhook is slow, /credits will still be right later.
 export function PurchaseSuccess() {
+  return (
+    <LangProvider>
+      <PurchaseSuccessInner />
+    </LangProvider>
+  );
+}
+
+function PurchaseSuccessInner() {
+  const t = useT();
   const [balance, setBalance] = useState<number | null>(null);
   const [settled, setSettled] = useState(false);
 
@@ -49,25 +59,26 @@ export function PurchaseSuccess() {
       <header className="border-b border-border/70 bg-background/70 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <BrandMark to="/app" />
+          <LangToggle />
         </div>
       </header>
       <main className="mx-auto max-w-xl px-5 py-20 text-center">
         <h1 className="font-display text-4xl font-semibold tracking-tight text-primary">
-          Payment received
+          {t("paidH1")}
         </h1>
         <p className="mt-4 text-muted-foreground">
-          {settled ? "Your credits are ready." : "Adding your credits…"}
+          {settled ? t("paidReady") : t("paidAdding")}
         </p>
         <p className="mt-6 font-display text-5xl font-semibold tabular-nums text-primary">
           {balance === null ? "…" : Math.floor(balance)}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">current balance</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("currentBalance")}</p>
         <div className="mt-10 flex justify-center gap-3">
           <Button asChild>
-            <Link href="/upload">Transcribe a video</Link>
+            <Link href="/upload">{t("goTranscribe")}</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/credits">View history</Link>
+            <Link href="/credits">{t("viewHistory")}</Link>
           </Button>
         </div>
       </main>

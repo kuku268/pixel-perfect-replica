@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
 // One shared "which tier is in flight" flag would need lifting state up; a
 // module-level lock is enough to stop a double-click opening two Checkouts.
@@ -38,6 +39,7 @@ export function BuyCreditsButton({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   async function buy() {
     if (inFlight) return;
@@ -61,12 +63,12 @@ export function BuyCreditsButton({
         return;
       }
       if (!response.ok || !body?.url) {
-        setError(body?.error ?? `Checkout failed (${response.status})`);
+        setError(body?.error ?? t("checkoutFailed", { n: response.status }));
         return;
       }
       window.location.href = body.url;
     } catch {
-      setError("Network error — please try again.");
+      setError(t("networkError"));
     } finally {
       inFlight = false;
       setPending(false);
@@ -76,7 +78,7 @@ export function BuyCreditsButton({
   return (
     <div className="space-y-2">
       <Button className="w-full" variant={variant} onClick={buy} disabled={pending}>
-        {pending ? "Opening checkout…" : label}
+        {pending ? t("openingCheckout") : label}
       </Button>
       {error ? (
         <p role="alert" className="text-xs text-destructive">

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useT } from "@/lib/i18n";
 
 export function SummaryCell({
   jobId,
@@ -24,6 +25,7 @@ export function SummaryCell({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const t = useT();
 
   // Nothing to summarise until the transcript exists.
   if (status !== "done") {
@@ -40,14 +42,14 @@ export function SummaryCell({
         | null;
 
       if (!response.ok || !body?.summary) {
-        setError(body?.error ?? `Request failed (${response.status})`);
+        setError(body?.error ?? t("requestFailed", { n: response.status }));
         return;
       }
 
       setSummary(body.summary);
       setOpen(true);
     } catch {
-      setError("Network error — please try again.");
+      setError(t("networkError"));
     } finally {
       setPending(false);
     }
@@ -62,7 +64,7 @@ export function SummaryCell({
           className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
         >
           <FileText aria-hidden="true" className="size-4" />
-          View
+          {t("viewSummary")}
         </button>
       ) : (
         <button
@@ -72,7 +74,7 @@ export function SummaryCell({
           className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:no-underline"
         >
           <Sparkles aria-hidden="true" className="size-4" />
-          {pending ? "Summarizing…" : "Summarize"}
+          {pending ? t("summarizing") : t("summarize")}
         </button>
       )}
 
@@ -85,9 +87,9 @@ export function SummaryCell({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl text-primary">Summary</DialogTitle>
+            <DialogTitle className="font-display text-2xl text-primary">{t("summaryTitle")}</DialogTitle>
             <DialogDescription>
-              Cached after first generation — open again any time at no cost.
+              {t("summaryDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">

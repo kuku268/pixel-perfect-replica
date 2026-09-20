@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { useT } from "@/lib/i18n";
+
 // Two modes:
 //  - `balance` given (server pages: /upload, /credits) — the value comes from the
 //    server component, so every router.refresh() delivers the fresh number. No
@@ -12,6 +14,7 @@ import Link from "next/link";
 export function CreditsBadge({ balance }: { balance?: number }) {
   const serverDriven = balance !== undefined;
   const [fetched, setFetched] = useState<number | null>(null);
+  const t = useT();
 
   useEffect(() => {
     if (serverDriven) return;
@@ -40,13 +43,13 @@ export function CreditsBadge({ balance }: { balance?: number }) {
     <Link
       href="/credits"
       className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground shadow-sm hover:border-primary/50"
-      title="1 credit = 1 minute of video"
+      title={t("badgeTitle")}
     >
-      <span className="text-muted-foreground">Credits</span>
+      <span className="text-muted-foreground">{t("badgeCredits")}</span>
       <span className="font-semibold tabular-nums text-primary transition-colors">
         {shown === null || shown === undefined ? "…" : Math.floor(shown)}
       </span>
-      <span className="text-muted-foreground">· Buy more</span>
+      <span className="text-muted-foreground">· {t("badgeBuyMore")}</span>
     </Link>
   );
 }

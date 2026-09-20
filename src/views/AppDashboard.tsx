@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { CreditsBadge } from "@/components/CreditsBadge";
 import { Button } from "@/components/ui/button";
 import { signOut, useAuth } from "@/hooks/useAuth";
+import { LangProvider } from "@/lib/i18n";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
 
 const title = "Dashboard — Video Speed Reader";
@@ -37,6 +38,7 @@ export default function AppDashboard() {
   }
 
   return (
+    <LangProvider>
     <div className="min-h-screen bg-hero">
       <header className="border-b border-border/70 bg-background/70 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
@@ -63,5 +65,6 @@ export default function AppDashboard() {
         </div>
       </main>
     </div>
+    </LangProvider>
   );
 }
