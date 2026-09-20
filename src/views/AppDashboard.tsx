@@ -90,12 +90,12 @@ function LanguageChoice() {
             key={o.value}
             type="button"
             onClick={() => choose(o.value)}
-            className={`rounded-2xl border p-6 text-left transition-colors hover:border-primary ${
-              lang === o.value ? "border-primary bg-primary/5" : "border-border bg-background/60"
+            className={`rounded-2xl bg-primary p-6 text-left text-primary-foreground shadow-card transition hover:bg-primary/90 ${
+              lang === o.value ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : ""
             }`}
           >
-            <span className="block font-display text-2xl font-semibold text-primary">{o.title}</span>
-            <span className="mt-1 block text-sm text-muted-foreground">{o.note}</span>
+            <span className="block font-display text-2xl font-semibold">{o.title}</span>
+            <span className="mt-1 block text-sm text-primary-foreground/85">{o.note}</span>
           </button>
         ))}
       </div>
