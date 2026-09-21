@@ -50,10 +50,18 @@ export default function SignIn() {
       }
       footer={
         <>
-          Don't have an account?{" "}
-          <Link href="/sign-up" className="font-medium text-primary hover:underline">
-            Sign up
-          </Link>
+          <span className="block">
+            還沒有帳號？{" "}
+            <Link href="/sign-up" className="font-medium text-primary hover:underline">
+              註冊
+            </Link>
+          </span>
+          <span className="mt-1 block">
+            Don&apos;t have an account?{" "}
+            <Link href="/sign-up" className="font-medium text-primary hover:underline">
+              Sign up
+            </Link>
+          </span>
         </>
       }
     />

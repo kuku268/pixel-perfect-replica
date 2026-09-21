@@ -54,10 +54,18 @@ export default function SignUp() {
       onSubmit={handleSubmit}
       footer={
         <>
-          Already have an account?{" "}
-          <Link href="/sign-in" className="font-medium text-primary hover:underline">
-            Sign in
-          </Link>
+          <span className="block">
+            已經有帳號？{" "}
+            <Link href="/sign-in" className="font-medium text-primary hover:underline">
+              登入
+            </Link>
+          </span>
+          <span className="mt-1 block">
+            Already have an account?{" "}
+            <Link href="/sign-in" className="font-medium text-primary hover:underline">
+              Sign in
+            </Link>
+          </span>
         </>
       }
     />
