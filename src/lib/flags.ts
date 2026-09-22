@@ -19,7 +19,7 @@ export const STANDARD_CREDITS_PER_MINUTE = 1;
 export const PRO_CREDITS_PER_MINUTE = Number(process.env.PRO_CREDITS_PER_MINUTE ?? "2") || 2;
 
 // Business-tier outputs a job can request (jobs.formats CHECK constraint).
-export const PRO_FORMATS = ["docx", "pdf", "srt"] as const;
+export const PRO_FORMATS = ["docx", "srt"] as const;
 export type ProFormat = (typeof PRO_FORMATS)[number];
 
 export function parseFormats(value: unknown): ProFormat[] | null {

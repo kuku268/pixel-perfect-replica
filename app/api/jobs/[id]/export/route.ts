@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { buildMinutesDocx } from "@/lib/exports/docx";
-import { buildReportPdf } from "@/lib/exports/pdf";
 import { PRO_TIER_ENABLED, type ProFormat } from "@/lib/flags";
 import { displaySource, isProJob, isResponse, loadOwnedJob, loadTranscript } from "@/lib/jobs";
 import { deleteObject } from "@/lib/s3";
 import { applyOverrides, toSrt, toTxt, toVtt } from "@/lib/transcript";
 
-// GET  /api/jobs/[id]/export?format=txt|srt|vtt|docx|pdf&lang=zh|en
+// GET  /api/jobs/[id]/export?format=txt|srt|vtt|docx&lang=zh|en
 //   Renders the requested file on demand from segments ⊕ overrides.
 //   txt is the standard-tier download (no timestamps, no speakers) and is
-//   always allowed; srt/vtt/docx/pdf need a business-tier job that
+//   always allowed; srt/vtt/docx need a business-tier job that
 //   requested that format (post-hoc "+ add" just updates jobs.formats).
 //
 // POST /api/jobs/[id]/export
@@ -19,11 +18,11 @@ import { applyOverrides, toSrt, toTxt, toVtt } from "@/lib/transcript";
 
 type Params = { params: Promise<{ id: string }> };
 
-const FORMATS = new Set(["txt", "srt", "vtt", "docx", "pdf"]);
+const FORMATS = new Set(["txt", "srt", "vtt", "docx"]);
 
 function requiredProFormat(format: string): ProFormat | null {
   if (format === "srt" || format === "vtt") return "srt";
-  if (format === "docx" || format === "pdf") return format;
+  if (format === "docx") return format;
   return null;
 }
 
@@ -37,7 +36,7 @@ export async function GET(request: Request, { params }: Params) {
   const format = url.searchParams.get("format") ?? "txt";
   const lang = url.searchParams.get("lang") ?? "zh";
   if (!FORMATS.has(format)) {
-    return NextResponse.json({ error: "format must be txt, srt, vtt, docx or pdf" }, { status: 400 });
+    return NextResponse.json({ error: "format must be txt, srt, vtt or docx" }, { status: 400 });
   }
   if (job.status !== "done") {
     return NextResponse.json({ error: "not ready" }, { status: 409 });
@@ -88,18 +87,6 @@ export async function GET(request: Request, { params }: Params) {
         lang,
       });
       return file(buf, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", `minutes-${id.slice(0, 8)}.docx`);
-    }
-    case "pdf": {
-      const buf = await buildReportPdf({
-        title: job.topic || displaySource(job),
-        createdAt: job.created_at,
-        source: displaySource(job),
-        segments,
-        speakers: speakers ?? {},
-        summary: transcript.session.summary_content,
-        lang,
-      });
-      return file(buf, "application/pdf", `report-${id.slice(0, 8)}.pdf`);
     }
     default:
       return NextResponse.json({ error: "unsupported" }, { status: 400 });

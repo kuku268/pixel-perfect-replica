@@ -20,7 +20,7 @@ import type { JobListItem } from "./jobs-types";
 // on the next auto-refresh and the worker charges only on completion.
 
 export function formatLabel(t: ReturnType<typeof useT>, f: ProFormat): string {
-  return f === "docx" ? t("minutes") : f === "pdf" ? t("report") : t("subsSpk");
+  return f === "docx" ? t("minutes") : t("subsSpk");
 }
 
 export function unlockCost(job: JobListItem): number {
@@ -33,7 +33,7 @@ export function UnlockDialog({
   balance,
   open,
   onOpenChange,
-  initialFormats = ["docx", "pdf"],
+  initialFormats = ["docx"],
 }: {
   job: JobListItem;
   balance: number;

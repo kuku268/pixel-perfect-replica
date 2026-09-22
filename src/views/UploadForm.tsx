@@ -58,7 +58,7 @@ export function UploadForm() {
   const [topic, setTopic] = useState("");
   const [language, setLanguage] = useState("auto");
   const [tier, setTier] = useState<"standard" | "pro">("standard");
-  const [formats, setFormats] = useState<ProFormat[]>(["docx", "pdf"]);
+  const [formats, setFormats] = useState<ProFormat[]>(["docx"]);
   const [speakersExpected, setSpeakersExpected] = useState("");
   const [upload, setUpload] = useState<UploadState>({ phase: "empty" });
   const [dragOver, setDragOver] = useState(false);
@@ -345,7 +345,7 @@ export function UploadForm() {
                           onCheckedChange={(v) => toggleFormat(f, v === true)}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <span>{f === "docx" ? t("minutes") : f === "pdf" ? t("report") : t("subsSpk")}</span>
+                        <span>{f === "docx" ? t("minutes") : t("subsSpk")}</span>
                         <span className="font-mono text-[11px] text-muted-foreground">.{f}</span>
                       </label>
                     ))}

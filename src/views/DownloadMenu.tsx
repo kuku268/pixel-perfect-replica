@@ -23,7 +23,7 @@ import { formatLabel, UnlockDialog, unlockCost } from "./UnlockDialog";
 // B unlock in progress (child job running), C business job (chosen formats
 // download, the rest show "+ Add", plus the editor entry).
 
-const ICONS: Record<ProFormat, typeof FileText> = { docx: FileText, pdf: FileText, srt: Captions };
+const ICONS: Record<ProFormat, typeof FileText> = { docx: FileText, srt: Captions };
 
 export function DownloadMenu({
   job,

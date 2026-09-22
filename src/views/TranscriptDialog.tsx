@@ -683,7 +683,7 @@ export function TranscriptDialog({
                     key={f}
                     onSelect={() => (audioGone ? void exportAndDelete(f) : setExportConfirm(f))}
                   >
-                    {f === "txt" ? t("plainText") : formatLabel(t, f as "docx" | "pdf" | "srt")}
+                    {f === "txt" ? t("plainText") : formatLabel(t, f as "docx" | "srt")}
                     <span className="ml-auto font-mono text-[11px] text-muted-foreground">.{f}</span>
                   </DropdownMenuItem>
                 ))}
